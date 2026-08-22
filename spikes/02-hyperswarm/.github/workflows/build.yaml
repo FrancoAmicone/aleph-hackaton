@@ -1,0 +1,83 @@
+name: Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.host }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            host: linux-x64
+          - os: ubuntu-24.04-arm
+            host: linux-arm64
+          - os: macos-latest
+            host: darwin-arm64
+          - os: macos-15-intel
+            host: darwin-x64
+          - os: windows-latest
+            host: win32-x64
+          - os: windows-11-arm
+            host: win32-arm64
+    steps:
+      - name: Setup repo
+        uses: holepunchto/actions/.github/steps/setup-repo@v1
+
+      - name: Install w/ dev deps
+        run: npm ci
+
+      - name: Build
+        run: npm run make:${{ matrix.host }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.host }}
+          path: out/${{ matrix.host }}/hello-pear-bare*
+          if-no-files-found: error
+          retention-days: 1
+
+  package:
+    name: Package by-arch
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Setup repo
+        uses: holepunchto/actions/.github/steps/setup-repo@v1
+
+      - name: Download builds
+        uses: actions/download-artifact@v4
+        with:
+          path: apps
+
+      - name: Build by-arch
+        run: |
+          chmod +x apps/darwin-*/hello-pear-bare apps/linux-*/hello-pear-bare
+          npx --yes pear-build@1.1.1 \
+            --darwin-arm64-app apps/darwin-arm64/hello-pear-bare \
+            --darwin-x64-app apps/darwin-x64/hello-pear-bare \
+            --linux-arm64-app apps/linux-arm64/hello-pear-bare \
+            --linux-x64-app apps/linux-x64/hello-pear-bare \
+            --win32-x64-app apps/win32-x64/hello-pear-bare.exe \
+            --win32-arm64-app apps/win32-arm64/hello-pear-bare.exe \
+            --target deployment \
+            --package package.json
+          tar -C deployment -czf by-arch.tar.gz .
+
+      - name: Upload by-arch
+        uses: actions/upload-artifact@v4
+        with:
+          name: by-arch
+          path: by-arch.tar.gz
+          if-no-files-found: error

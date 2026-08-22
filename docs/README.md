@@ -18,6 +18,29 @@ Si el tema no está cubierto, ir a `08-links.md`, agarrar el link oficial y trae
 | Algo se rompió y no sé por qué | `06-troubleshooting.md` |
 | Definir qué construimos | `07-ideas.md` |
 | Necesito la fuente original de algo | `08-links.md` |
+| Leer teclas sueltas / raw mode / TUI | `05-bare-runtime.md` + `spikes/01-raw-input/SPIKE.md` |
+| Código P2P que ya funciona, para copiar | `spikes/02-hyperswarm/SPIKE.md` |
+
+## Spikes — código probado, no teoría
+
+En `spikes/` hay dos pruebas de concepto **corribles y verificadas**, cada una con su `SPIKE.md`:
+
+| Spike | Pregunta que responde | Resultado |
+|---|---|---|
+| `01-raw-input` | ¿Se pueden leer teclas sueltas sin bloquear el loop en Bare? | ✅ Sí, con `bare-tty` |
+| `02-hyperswarm` | ¿Dos procesos se encuentran por topic e intercambian JSON? | ✅ Sí, con salvedades |
+
+Los hallazgos de ambos ya están volcados en `04-p2p.md`, `05-bare-runtime.md` y
+`06-troubleshooting.md`. **Los spikes son la fuente: si un doc y el código del spike se
+contradicen, gana el spike** — está probado.
+
+Las 3 cosas que más tiempo ahorran si las leés antes de escribir código:
+
+1. **`framed.on('error')` además de `conn.on('error')`** — sin eso, un peer que se cae
+   mata el proceso del otro. Ver `04-p2p.md`.
+2. **Ctrl+C no es SIGINT en raw mode** — llega como byte `0x03`. Ver `05-bare-runtime.md`.
+3. **El discovery falla ~30% de las veces al primer intento** — el juego necesita retry.
+   Ver `04-p2p.md`.
 
 ## Cómo mantener esto
 

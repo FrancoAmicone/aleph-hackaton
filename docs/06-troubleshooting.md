@@ -12,9 +12,60 @@ Causas posibles:
   de los registros del HyperDHT. → Siempre `await swarm.destroy()` al salir.
 - **Firewalls** bloqueando tráfico.
 
+> **MEDIDO (spike 2):** dos peers en la misma máquina, 10 corridas por escenario.
+> Con teardown sucio (`kill -9`): **4/10** conectaron. Con teardown limpio
+> (`await swarm.destroy()`): **7/10**. O sea el teardown sucio **casi duplica los fallos** —
+> esto no es teoría, pasa. Y aún limpio, 3 de 10 no conectan ni esperando 40s.
+> Cuando conecta, tarda ~7s consistentemente.
+> **Conclusión: el juego necesita retry de `join` si no aparece nadie en ~10-15s.**
+> Detalle completo en `04-p2p.md`.
+
 > **[NUESTRO] El wifi de una hackathon es exactamente el peor caso** (NAT simétrico, portal cautivo,
 > puertos bloqueados). Plan B: probar todo también con hotspot de celular. Y probar la conectividad
 > entre dos máquinas **temprano**, no a las 3 AM.
+
+## Errores concretos que ya nos pasaron (spikes 1 y 2)
+
+### `Uncaught Error: connection reset by peer` y se muere el proceso
+
+Stack apuntando a `FramedStream._destroy` / `streamx`. **Falta el handler de error en el stream
+que envuelve al `conn`**, no en el `conn`. Hay que registrar los dos:
+
+```javascript
+conn.on('error', ...)
+framed.on('error', ...)   // este es el que falta siempre
+```
+
+Síntoma en un juego: un jugador cierra la ventana y al otro se le cae el proceso.
+
+### El proceso no termina nunca / queda colgado al salir
+
+Falta soltar algún handle propio. Un `setInterval` vivo (el game loop, el heartbeat) mantiene
+el loop de Bare aunque el swarm ya esté destruido. `clearInterval()` en el teardown.
+
+Si además hay un worker de `PearRuntime.run` activo, `Bare.exit()` a secas se cuelga:
+hay que cerrar la App primero (`app.exit(code)`).
+
+### `INVALID_URL: Invalid URL 'pear://<YOUR_KEY_HERE>'` (exit 134, core dumped)
+
+El template recién clonado trae ese placeholder en `package.json` → `upgrade`. El worker crashea
+y **se lleva el proceso puesto**. `pear touch` + `npm pkg set upgrade=pear://<key>` no es opcional
+ni siquiera para correr en dev.
+
+### `kill` a un proceso de Bare no hace nada
+
+`./node_modules/.bin/bare` es un wrapper de **Node** con `suppressSignals: true`: registra
+handlers no-op para SIGTERM/SIGINT/SIGHUP y spawnea el binario real como hijo.
+
+- Ctrl+C en una terminal anda bien (la señal va a todo el process group).
+- Matar por PID al wrapper no propaga nada al hijo. En scripts, usar el binario real:
+  `node_modules/bare-runtime-<platform>-<arch>/bin/bare`.
+
+### El peer se cayó y el otro no se entera
+
+Esperado: Hyperswarm va sobre UDX (UDP), no hay `RST` que avise. Un cierre ordenado se detecta
+al instante; un `kill -9` **no se detectó en 10s**. Hace falta un heartbeat de aplicación.
+Ver `04-p2p.md`.
 
 ## Problemas del runtime Bare
 
