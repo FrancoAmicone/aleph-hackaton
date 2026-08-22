@@ -25,9 +25,6 @@ const { envidoPoints, hasFlor, florPoints } = require('../truco/envido')
 // Frames of the spinner shown while the rivals are thinking.
 const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 
-// A full Spanish deck, for the "cards left in the mazo" readout.
-const DECK_SIZE = 40
-
 const MESA_WIDTH = COLUMNS.centre
 
 function stack(...blocks) {
@@ -91,27 +88,46 @@ function felt(game) {
 // Each player gets a panel of their own, the way the reference frames them:
 // the seat's name as the title, the cards still in their hand below it, and
 // anything they just said. The cards they have *played* are on the table.
-function playerPanel(game, seat, view, width, height) {
+// A seat as a single line: who they are, what they still hold, what they just
+// said. The panels these replaced spent eleven rows saying the same thing.
+function seatLine(game, seat, view) {
   const player = game.players[seat]
   const onTurn = game.currentActor() === seat
-  const inner = width - 2
 
-  const title = onTurn ? `▶ ${player.name}` : player.name
-  const backs = pad(cards.backsInline(game.hands[seat].length), inner)
+  const name = onTurn
+    ? style().bold(true).foreground(SKY).render(`▶ ${player.name}`)
+    : style()
+        .foreground(player.team === 0 ? LIGHT : MID)
+        .render(player.name)
 
+  const backs = cards.backsInline(game.hands[seat].length)
   const said = view.says && view.says[seat]
-  const bubble = said
-    ? pad(style.truncate(style().italic(true).foreground(SKY).render(`«${said}»`), inner), inner)
-    : ''
+  const bubble = said ? '  ' + style().italic(true).foreground(SKY).render(`«${said}»`) : ''
 
-  return panel(title, stack('', backs, bubble), width, height, {
-    tone: onTurn ? SKY : player.team === 0 ? LIGHT : MID
-  })
+  return `${name} ${backs}${bubble}`
 }
 
-// The felt: the played cards laid out at the four seats, the trick markers in
-// the middle, and a suit watermark under them. This is the centre of the
-// screen and it gets the whole middle column.
+// The flanking seats stack their name over their cards, so the felt keeps its
+// full width. Truncated to the flank so a long canto cannot widen the row.
+function flankLine(game, seat, view, align) {
+  const player = game.players[seat]
+  const onTurn = game.currentActor() === seat
+
+  const name = onTurn
+    ? style().bold(true).foreground(SKY).render(player.name)
+    : style()
+        .foreground(player.team === 0 ? LIGHT : MID)
+        .render(player.name)
+
+  const said = view.says && view.says[seat]
+  const rows = [name, cards.backsInline(game.hands[seat].length)]
+  if (said) rows.push(style().italic(true).foreground(SKY).render(`«${said}»`))
+
+  return rows.map((r) => pad(style.truncate(r, FLANK), FLANK, align)).join('\n')
+}
+
+const FLANK = 10
+
 function feltBlock(game, seats) {
   const inner = COLUMNS.centre - 2
   const rows = []
@@ -152,7 +168,26 @@ function seatsOf(game) {
 
 // The table on its own — the seats around it are drawn as panels by renderGame.
 function renderMesa(game, view) {
-  return feltBlock(game, seatsOf(game))
+  const seats = seatsOf(game)
+  const duel = game.playerCount === 2
+
+  const table = duel
+    ? feltBlock(game, seats)
+    : style.joinHorizontal(
+        style.position.center,
+        flankLine(game, seats.west, view, 'right'),
+        ' ',
+        feltBlock(game, seats),
+        ' ',
+        flankLine(game, seats.east, view, 'left')
+      )
+
+  const w = CANVAS.width
+  return stack(
+    pad(seatLine(game, seats.north, view), w),
+    pad(table, w),
+    pad(seatLine(game, seats.south, view), w)
+  )
 }
 
 // --- panels -------------------------------------------------------------
@@ -174,7 +209,7 @@ const CANTO_HINTS = {
   retruco: 'retruco',
   'vale-cuatro': 'vale cuatro',
   envido: 'envido',
-  'real-envido': 'real envido',
+  'real-envido': 'real',
   'falta-envido': 'falta',
   flor: 'flor',
   contraflor: 'contraflor',
@@ -183,103 +218,97 @@ const CANTO_HINTS = {
 
 // What you can do right now, taken straight from the engine's legal actions so
 // the list can never drift out of step with the rules.
-function commandLines(game) {
-  const rows = []
-  const add = (k, label) =>
-    rows.push(
-      style().bold(true).foreground(SKY).render(`[${k}]`.padEnd(8)) +
-        style().foreground(WHITE).render(label)
-    )
-
+// Everything you can do right now, as [key, label] pairs, taken straight from
+// the engine's legal actions so the list can never drift from the rules.
+function commands(game) {
   if (game.phase === 'game-over') {
-    add('ENTER', 'al menú')
-    add('ESC', 'salir')
-    return rows.join('\n')
+    return [
+      ['ENTER', 'menú'],
+      ['ESC', 'salir']
+    ]
   }
-
   if (game.phase === 'hand-over') {
-    add('ENTER', 'seguir')
-    add('ESC', 'menú')
-    return rows.join('\n')
+    return [
+      ['ENTER', 'seguir'],
+      ['ESC', 'menú']
+    ]
   }
 
   const actions = game.legalActions(0)
-  if (actions.length === 0) return style().faint(true).render('esperando…')
+  if (actions.length === 0) return []
 
-  if (game.phase === 'response') {
-    add('Q', 'quiero')
-    add('N', 'no quiero')
-  } else {
-    add('1-3', 'jugar carta')
-    add('←/→', 'elegir')
-    add('ENTER', 'jugar')
-  }
+  const rows =
+    game.phase === 'response'
+      ? [
+          ['Q', 'quiero'],
+          ['N', 'no quiero']
+        ]
+      : [
+          ['1-3', 'carta'],
+          ['←/→', 'elegir'],
+          ['ENTER', 'jugar']
+        ]
 
   for (const action of actions) {
-    if (action.type === 'canto') add(CANTO_KEYS[action.canto], CANTO_HINTS[action.canto])
+    if (action.type === 'canto') rows.push([CANTO_KEYS[action.canto], CANTO_HINTS[action.canto]])
   }
 
-  if (game.phase === 'play') add('M', 'al mazo')
-  add('ESC', 'menú')
-
-  return rows.join('\n')
+  if (game.phase === 'play') rows.push(['M', 'mazo'])
+  rows.push(['ESC', 'menú'])
+  return rows
 }
 
-// The state of the match at a glance.
+// One line under the table. If the full set does not fit, the least useful
+// hints drop out rather than the line wrapping or being cut mid-word.
+const OPTIONAL = ['elegir', 'carta']
+
+function commandLine(game, width) {
+  let rows = commands(game)
+  if (rows.length === 0) return ''
+
+  const render = (list) =>
+    list
+      .map(
+        ([k, label]) =>
+          style().bold(true).foreground(SKY).render(`[${k}]`) +
+          style()
+            .foreground(WHITE)
+            .render(' ' + label)
+      )
+      .join(style().faint(true).render(' · '))
+
+  let line = render(rows)
+  for (const drop of OPTIONAL) {
+    if (style.width(line) + 2 <= width) break
+    rows = rows.filter(([, label]) => label !== drop)
+    line = render(rows)
+  }
+
+  return '  ' + style.truncate(line, width - 2)
+}
+
+// Only what the header and the felt do not already say. Scores, the stake and
+// the hand number live in the score bar; repeating them here was noise.
 function partidaLines(game) {
   const actor = game.currentActor()
-  const stake = game.handValue()
+  const dealt = game.dealt[0]
 
   const rows = [
-    ['Mano', String(game.handNumber)],
     ['Turno', actor === null ? '—' : game.players[actor].name],
-    ['Jugadores', String(game.playerCount)],
-    ['En juego', `${stake} ${stake === 1 ? 'punto' : 'puntos'}`],
-    ['Nosotros', String(game.scores[0])],
-    ['Ellos', String(game.scores[1])],
-    ['Meta', String(game.target)]
+    ['Tu envido', String(envidoPoints(dealt))]
   ]
+  if (hasFlor(dealt)) rows.push(['Tu flor', String(florPoints(dealt))])
+  rows.push(['Mano', `${game.handNumber} · a ${game.target}`])
 
-  const body = rows.map(
-    ([term, value]) =>
-      style().foreground(WHITE).render(term.padEnd(11)) +
-      style().bold(true).foreground(SKY).render(value)
-  )
-
-  const dealt = game.dealt[0]
-  body.push('')
-  body.push(
-    style().faint(true).render('tu envido  ') +
-      style()
-        .foreground(LIGHT)
-        .render(String(envidoPoints(dealt)))
-  )
-  if (hasFlor(dealt)) {
-    body.push(
-      style().faint(true).render('tu flor    ') +
-        style()
-          .foreground(SKY)
-          .render(String(florPoints(dealt)))
+  return rows
+    .map(
+      ([term, value]) =>
+        style().foreground(WHITE).render(term.padEnd(11)) +
+        style().bold(true).foreground(SKY).render(value)
     )
-  }
-
-  return body.join('\n')
+    .join('\n')
 }
 
-// The deck: a face-down stack, and how much of it is left after the deal.
-function mazoLines(game) {
-  const left = DECK_SIZE - game.playerCount * 3
-  const inner = COLUMNS.right - 4
-
-  const count =
-    style().foreground(WHITE).render('Quedan ') +
-    style().bold(true).foreground(SKY).render(String(left)) +
-    style().foreground(WHITE).render(' cartas')
-
-  return stack(pad(cards.bigBack(), inner), '', pad(count, inner))
-}
-
-// The running feed, tagged by who said it — the chat of the table.
 function chatLines(game, width, height) {
   const lines = []
 
@@ -446,76 +475,57 @@ function renderPrompt(game, view) {
 
 // Row budgets per panel. The three columns come to the same height, which is
 // what makes the dashboard read as one grid.
-const PANEL_ROWS = {
-  comandos: 14,
-  oeste: 6,
-  partida: 13,
-  norte: 5,
-  mesa: 13,
-  vos: 5,
-  cartas: 10,
-  mazo: 10,
-  este: 6,
-  chat: 17
-}
+// The two panels that survive, side by side across the top.
+const TOP = { partida: 34, chat: 84, rows: 8 }
 
 function renderGame(game, view) {
   const width = CANVAS.width
-  const seats = seatsOf(game)
-  const duel = game.playerCount === 2
 
-  // Left: what you can do, the rival on your left, the state of the match.
-  const left = stack(
-    panel('COMANDOS', commandLines(game), COLUMNS.left, PANEL_ROWS.comandos),
-    duel ? null : playerPanel(game, seats.west, view, COLUMNS.left, PANEL_ROWS.oeste),
-    panel('PARTIDA', partidaLines(game), COLUMNS.left, PANEL_ROWS.partida)
-  )
-
-  // Centre: the partner, the table, you, your hand — all the same width, so the
-  // column reads as one piece from top to bottom.
-  const centre = stack(
-    playerPanel(game, seats.north, view, COLUMNS.centre, PANEL_ROWS.norte),
-    renderMesa(game, view),
-    playerPanel(game, seats.south, view, COLUMNS.centre, PANEL_ROWS.vos),
-    panel('TUS CARTAS', handLines(game, view), COLUMNS.centre, PANEL_ROWS.cartas)
-  )
-
-  // Right: the deck, the rival on your right, the table talk.
-  const right = stack(
-    panel('MAZO', mazoLines(game), COLUMNS.right, PANEL_ROWS.mazo),
-    duel ? null : playerPanel(game, seats.east, view, COLUMNS.right, PANEL_ROWS.este),
-    panel(
-      'CHAT / LOG',
-      chatLines(game, COLUMNS.right - 2, PANEL_ROWS.chat - 3),
-      COLUMNS.right,
-      PANEL_ROWS.chat
-    )
-  )
-
-  const gutter = ' '.repeat(COLUMNS.gutter)
-  const body = style.joinHorizontal(
+  // Top: the little that is not already on the felt or in the score bar.
+  const top = style.joinHorizontal(
     style.position.top,
-    pad(left, COLUMNS.left, 'left'),
-    gutter,
-    pad(centre, COLUMNS.centre, 'left'),
-    gutter,
-    pad(right, COLUMNS.right, 'left')
+    panel('PARTIDA', partidaLines(game), TOP.partida, TOP.rows),
+    ' '.repeat(COLUMNS.gutter),
+    panel('CHAT / LOG', chatLines(game, TOP.chat - 2, TOP.rows - 3), TOP.chat, TOP.rows)
   )
 
-  const top = stack(renderHeader(game, view, width), renderScore(game, width), '', body).split('\n')
-  const foot = [renderPrompt(game, view)]
-  const gap = Math.max(0, CANVAS.height - top.length - foot.length)
+  // Middle: the table, with its four seats around it.
+  const mesa = renderMesa(game, view)
 
-  return fit([...top, ...Array(gap).fill(''), ...foot].join('\n'))
+  // Bottom: your hand, then every command on one line.
+  const cartas = pad(handLines(game, view), width)
+  const comandos = commandLine(game, width)
+  const aviso = view.message
+    ? style()
+        .bold(true)
+        .foreground(SKY)
+        .render('  ' + view.message)
+    : renderPrompt(game, view)
+
+  const body = stack(
+    renderHeader(game, view, width),
+    renderScore(game, width),
+    '',
+    pad(top, width),
+    '',
+    mesa,
+    '',
+    cartas
+  ).split('\n')
+
+  const foot = [aviso, comandos]
+  const gap = Math.max(0, CANVAS.height - body.length - foot.length)
+
+  return fit([...body, ...Array(gap).fill(''), ...foot].join('\n'))
 }
 
 module.exports = {
   renderGame,
   renderMesa,
   renderPrompt,
-  commandLines,
+  commands,
+  commandLine,
   partidaLines,
-  mazoLines,
   chatLines,
   handLines,
   panel,

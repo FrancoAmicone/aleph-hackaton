@@ -11,15 +11,15 @@ const { decide } = require('../lib/truco/ai')
 const {
   renderGame,
   panel,
-  commandLines,
+  commands,
+  commandLine,
   partidaLines,
-  mazoLines,
   chatLines
 } = require('../lib/ui/screen')
 const { titleBlock } = require('../lib/ui/menu')
 const { bars, block, GLYPHS } = require('../lib/ui/bars')
 const { renderMesa } = require('../lib/ui/screen')
-const { CANVAS, COLUMNS } = require('../lib/ui/canvas')
+const { CANVAS } = require('../lib/ui/canvas')
 const palette = require('../lib/ui/palette')
 const cardsUi = require('../lib/ui/cards')
 const App = require('../lib/ui/app')
@@ -278,12 +278,12 @@ test('mesa: never grows wider than its column, whatever is said', (t) => {
   const view = { selected: 0, says: {}, version: '1.0.0' }
 
   const quiet = renderMesa(game, view)
-  t.ok(widest(quiet) <= COLUMNS.centre, `the quiet table fits (${widest(quiet)})`)
+  t.ok(widest(quiet) <= CANVAS.width, `the quiet table fits (${widest(quiet)})`)
 
   // A long canto used to widen the flank and shove the right-hand panels off
   // the canvas, so the bubble is truncated to the flank width.
   const loud = renderMesa(game, { ...view, says: { 1: '¡Quiero vale cuatro y se acabó!' } })
-  t.ok(widest(loud) <= COLUMNS.centre, `the loud table fits too (${widest(loud)})`)
+  t.ok(widest(loud) <= CANVAS.width, `the loud table fits too (${widest(loud)})`)
 
   const duel = new Game({
     players: [
@@ -292,7 +292,7 @@ test('mesa: never grows wider than its column, whatever is said', (t) => {
     ],
     rng: seeded(4)
   })
-  t.ok(widest(renderMesa(duel, view)) <= COLUMNS.centre, 'and so does a duel')
+  t.ok(widest(renderMesa(duel, view)) <= CANVAS.width, 'and so does a duel')
 })
 
 test('panel: draws an exact rectangle whatever is inside it', (t) => {
@@ -308,37 +308,30 @@ test('panel: draws an exact rectangle whatever is inside it', (t) => {
   t.ok(stripAnsi(panel('MAZO', '', 20, 5)).includes('MAZO'), 'the title is drawn')
 })
 
-test('comandos: lists only what the rules allow, and follows the phase', (t) => {
+test('comandos: one line, only what the rules allow, and it always fits', (t) => {
   const game = new Game({ rng: seeded(5) })
-  const opening = stripAnsi(commandLines(game))
+  const opening = stripAnsi(commandLine(game, CANVAS.width))
 
-  t.ok(opening.includes('jugar carta'), 'you can play a card')
-  t.ok(opening.includes('envido'), 'and call envido on the first trick')
+  t.is(opening.split('\n').length, 1, 'a single line')
+  t.ok(opening.includes('envido'), 'envido is offered on the first trick')
   t.ok(opening.includes('truco'), 'and truco')
 
   game.envidoDone = true
   game.trucoLevel = 3
   game.trucoAccepted = true
   game.trucoTeam = 0
-  const later = stripAnsi(commandLines(game))
+  const later = stripAnsi(commandLine(game, CANVAS.width))
   t.absent(later.includes('envido'), 'no envido once it is spent')
   t.absent(later.includes('truco'), 'no truco once it is topped out')
 
-  game.phase = 'hand-over'
-  t.ok(stripAnsi(commandLines(game)).includes('seguir'), 'the phase changes the commands')
-
-  // Every row has to fit the panel it is drawn into, key column included. The
-  // states are built for real rather than by forcing `phase`, since a response
-  // with no pending canto is not a state the engine can actually be in.
-  const inner = COLUMNS.left - 2
+  // Built for real rather than by forcing `phase`, since a response with no
+  // pending canto is not a state the engine can be in.
   const responding = new Game({ rng: seeded(5) })
   responding.apply({ type: 'canto', seat: 0, canto: 'truco' })
-
-  const over = new Game({ rng: seeded(5) })
-  over.phase = 'game-over'
-
   const ended = new Game({ rng: seeded(5) })
   ended.phase = 'hand-over'
+  const over = new Game({ rng: seeded(5) })
+  over.phase = 'game-over'
 
   for (const [name, state] of [
     ['play', new Game({ rng: seeded(5) })],
@@ -346,38 +339,52 @@ test('comandos: lists only what the rules allow, and follows the phase', (t) => 
     ['hand-over', ended],
     ['game-over', over]
   ]) {
-    const rows = stripAnsi(commandLines(state)).split('\n')
-    t.ok(
-      rows.every((row) => style.width(row) <= inner),
-      `${name} rows fit the ${inner}-column panel`
-    )
+    const line = commandLine(state, CANVAS.width)
+    t.ok(style.width(line) <= CANVAS.width, `${name} fits the canvas`)
+    t.is(stripAnsi(line).split('\n').length, 1, `${name} stays on one line`)
   }
+
+  t.ok(stripAnsi(commandLine(ended, CANVAS.width)).includes('seguir'), 'the phase changes it')
 })
 
-test('partida: reports the state of the match', (t) => {
+test('comandos: the whole set fits the canvas on one line', (t) => {
+  const game = new Game({ rng: seeded(5) })
+  const line = commandLine(game, CANVAS.width)
+  const plain = stripAnsi(line)
+
+  t.ok(style.width(line) <= CANVAS.width, `fits (${style.width(line)}/${CANVAS.width})`)
+  for (const hint of [
+    'carta',
+    'elegir',
+    'jugar',
+    'envido',
+    'real',
+    'falta',
+    'truco',
+    'mazo',
+    'menú'
+  ]) {
+    t.ok(plain.includes(hint), `${hint} is on the line`)
+  }
+
+  // If it ever stops fitting, the soft hints go before the cantos do.
+  const tight = stripAnsi(commandLine(game, 80))
+  t.absent(tight.includes('elegir'), 'a tighter line sheds the arrow hint first')
+  t.ok(commands(game).length > 0, 'commands() is the shared source')
+})
+
+test('partida: reports only what the score bar does not', (t) => {
   const game = new Game({ rng: seeded(11) })
   game.scores = [12, 7]
   const drawn = stripAnsi(partidaLines(game))
 
-  t.ok(/Mano\s+1/.test(drawn), 'the hand number')
-  t.ok(/Nosotros\s+12/.test(drawn), 'our score')
-  t.ok(/Ellos\s+7/.test(drawn), 'theirs')
   t.ok(/Turno\s+Vos/.test(drawn), 'whose turn it is')
-  t.ok(/tu envido\s+\d+/.test(drawn), 'and your envido')
-})
+  t.ok(/Tu envido\s+\d+/.test(drawn), 'your envido')
+  t.ok(/Mano\s+1 · a 30/.test(drawn), 'the hand and the target')
 
-test('mazo: counts what is left after the deal', (t) => {
-  const four = new Game({ rng: seeded(3) })
-  t.ok(stripAnsi(mazoLines(four)).includes('28'), 'four hands of three leaves 28')
-
-  const duel = new Game({
-    players: [
-      { name: 'Vos', isAI: false },
-      { name: 'Rita', isAI: true }
-    ],
-    rng: seeded(3)
-  })
-  t.ok(stripAnsi(mazoLines(duel)).includes('34'), 'two hands of three leaves 34')
+  // The score bar already carries these; repeating them was noise.
+  t.absent(/Nosotros\s+12/.test(drawn), 'our score is not repeated')
+  t.absent(/Ellos\s+7/.test(drawn), 'nor theirs')
 })
 
 test('chat: tags the speaker without repeating their name', (t) => {
