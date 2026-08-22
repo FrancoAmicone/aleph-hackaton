@@ -81,8 +81,17 @@ Si el juego es una TUI que queda abierta → `main` o `single-thread`.
 - El template tiene branches no documentadas: **`origin/tui`** y `origin/simplify`.
   **Mirar `tui` antes de escribir el render del juego desde cero.**
 - **`Bare.env` NO existe.** Para env vars: `require('bare-process').env`. La app no usa ninguna.
-- ✅ **El P2P funciona.** Chat bidireccional entre dos peers verificado.
+- ✅ **El P2P funciona ENTRE MÁQUINAS REALES.** Franco ↔ Gino con `test-msg/app/conectar.js`
+  (HyperDHT por clave directa): conectó en 7.7s y sostuvo 327s de charla. Repetido desde una
+  segunda red: 12.6s. Ver `test-msg/docs/09-conexion-directa.md`.
   `firewalled=true` en el DHT es normal, no es un error.
+- ⚠️ **Un test en UNA SOLA máquina no prueba nada de P2P.** HyperDHT toma un atajo por LAN
+  (`remota: 192.168.x.x`, `punches consistent=0`) y **nunca ejercita el hole punching**.
+  Perdí horas reportando como "funciona" algo que solo funcionaba en localhost.
+- **Conexión directa por clave > topic, para probar conectividad.** Sin announce/lookup no hay
+  race ni anuncios fantasma. `DHT.keyPair(seed)` da clave estable entre reinicios.
+- **El DHT devuelve claves de peers MUERTOS.** Verificado. Como Hyperswarm genera clave nueva por
+  arranque, tus propias corridas viejas aparecen como "otro peer". Invalidó un diagnóstico entero.
 - **El tiempo de conexión tiene MUCHA varianza por un race de announce/lookup en el DHT.**
   Medido sin mitigar: 43s, 7s, 6s. Con `discovery.refresh()` cada 5s: 6s, 11s, 7s, 6s.
   **Dar 60s antes de concluir que algo P2P no conecta.** Un test de 20s me dio un falso negativo

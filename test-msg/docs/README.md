@@ -34,6 +34,8 @@ npm start -- --room hackaton --log /tmp/mi.log
 | `06-logs-y-monitoreo.md` | `--log` + `tail -f` para ver todo en tiempo real |
 | `07-que-pasa-por-debajo.md` | DHT, hole punching, cifrado: cómo se conectan dos peers sin servidor |
 | `08-procesos-zombi.md` | **Peers "fantasma" y cierre limpio.** Leelo antes de sacar conclusiones de un test |
+| `09-conexion-directa.md` | **`conectar.js` — P2P verificado entre máquinas reales.** El camino que funciona |
+| `10-caso-roman.md` | Lista de diagnóstico para la máquina que no conecta |
 
 ## Estado actual
 
@@ -45,8 +47,11 @@ npm start -- --room hackaton --log /tmp/mi.log
 | Template corre sin modificar | ✅ verificado |
 | Código del chat escrito | ✅ |
 | **Dos peers se conectan y se hablan** | ✅ **verificado** — misma máquina, bidireccional, 6-11s |
+| **P2P entre MÁQUINAS REALES (Franco ↔ Gino)** | ✅ **verificado** — `conectar.js`, 7.7s, charla de 327s |
+| Lo mismo desde una segunda red de Franco | ✅ 12.6s |
 | Logging a archivo (`--log`) para `tail -f` | ✅ |
 | Mitigación del race de conexión (`discovery.refresh`) | ✅ peor caso de 43s → 11s |
+| Máquina de Roman (Ubuntu 26) | 🔴 no conecta — ver `10-caso-roman.md` |
 | Lo mismo entre dos máquinas distintas | ⬜ falta (validación del escenario real) |
 | `npm run make` (binario) | ⬜ |
 | `pear stage` + `pear seed` | ⬜ |
