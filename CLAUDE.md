@@ -68,6 +68,41 @@ El reemplazo de `pear release` es `pear provision` + `pear multisig`.
 
 Si el juego es una TUI que queda abierta → `main` o `single-thread`.
 
+## Verificado empíricamente el 22-ago (no asumir, ya está probado)
+
+- **Pear instalado: v3.2.0.** `pear -v` — **es `-v`, no `--version`** (tira "Unrecognized Flag").
+- La lista real de comandos de la CLI confirma que **no existen `run` ni `init`**.
+- **`npm start` falla con `sh: bare: command not found`** hasta que se linkea el binario:
+  `ln -sf ../bare-runtime/bin/bare node_modules/.bin/bare`. Hay que rehacerlo tras borrar `node_modules`.
+- **`workers/main.js` del template es solo `require('hello-pear-worker')`** — la lógica real está en
+  ese paquete npm, no inline como dice la doc. Es la mejor referencia de uso de `PearRuntime`.
+- **`crypto.data(b4a.from(str))` → 32 bytes determinísticos.** Sirve para derivar topics desde
+  nombres de sala legibles.
+- El template tiene branches no documentadas: **`origin/tui`** y `origin/simplify`.
+  **Mirar `tui` antes de escribir el render del juego desde cero.**
+- **`Bare.env` NO existe.** Para env vars: `require('bare-process').env`. La app no usa ninguna.
+- ✅ **El P2P funciona.** Chat bidireccional entre dos peers verificado.
+  `firewalled=true` en el DHT es normal, no es un error.
+- **El tiempo de conexión tiene MUCHA varianza por un race de announce/lookup en el DHT.**
+  Medido sin mitigar: 43s, 7s, 6s. Con `discovery.refresh()` cada 5s: 6s, 11s, 7s, 6s.
+  **Dar 60s antes de concluir que algo P2P no conecta.** Un test de 20s me dio un falso negativo
+  que me llevó a culpar a NAT hairpinning — hipótesis equivocada.
+- **`discovery.flushed()` resuelve cuando TU announce propagó, no cuando encontraste a alguien.**
+  Confundir las dos cosas fue el origen del malentendido.
+- **Para el lobby del juego: mostrar "buscando jugadores…".** No asumir conexión instantánea.
+
+## Método para debuggear P2P (aprendido a la fuerza)
+
+No teorizar sobre la causa. Aislar capas de a una, hay scripts listos en `test-msg/app/`:
+
+1. `node diag-node.js A` → ¿Hyperswarm puro anda en esta red?
+2. `bare diag-bare.js A 1` → ¿anda bajo Bare?
+3. `bare diag-bare.js A 2` → ¿anda con dos swarms, como el worker?
+4. `npm start` → ¿anda la app real?
+
+El primer escalón que falla es la capa culpable. Saltearse escalones lleva a hipótesis equivocadas.
+Detalle en `test-msg/docs/05-diagnostico-red.md`.
+
 ## Workflow de comandos
 
 ```bash
@@ -107,11 +142,19 @@ Referencia completa en `docs/02-pear-cli.md` y `docs/03-deploy-ota.md`.
 
 ## Estado
 
-- [ ] Idea definida
-- [ ] Template clonado y corriendo
-- [ ] `pear://` link generado y seedeando
+App de prueba en `test-msg/` (chat P2P de terminal) para validar el flujo antes del juego.
+Bitácora detallada y paso a paso: **`test-msg/docs/`**.
+
+- [x] Template clonado y corriendo (`test-msg/app`)
+- [x] `pear://` link generado — `pear://9nbjjp5jmtxxq3jj8ko7z4sdfnohucgwyjsxspdpsnuc8yf136my` (de prueba)
+- [x] Código del chat escrito (worker + IPC + stdin + salas por nombre)
+- [x] **Dos peers se conectan y se hablan** — verificado, bidireccional, ~7s
+- [ ] Lo mismo entre dos máquinas distintas (validación del escenario del juzgado)
 - [ ] Binario buildeado (`npm run make`)
+- [ ] `pear stage` + `pear seed`
 - [ ] Instalado vía `pear install` en otra máquina
 - [ ] OTA verificado end-to-end
-- [ ] Lógica de la app
+- [ ] Idea del juego definida
 - [ ] README + video demo
+
+**Mantener `test-msg/docs/03-bitacora.md` actualizado con cada error nuevo y su fix.**

@@ -1,0 +1,16 @@
+# deps
+node_modules/
+
+# builds (los binarios se generan con `npm run make`, no se versionan)
+out/
+dist/
+
+# logs locales
+*.log
+
+# storage local de peers de prueba
+peer*/
+.pear/
+
+# macOS
+.DS_Store
