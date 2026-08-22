@@ -86,7 +86,51 @@ Otros: `bare-module`, `bare-bundle`, `bare-pack`, `bare-make` (build/packaging),
 
 `bare-tty` + `bare-readline` son la base para input interactivo de terminal.
 `process.stdin.on('data', ...)` (vía `bare-process`) alcanza para input crudo tipo chat.
-Para un juego con teclas sueltas hace falta raw mode — verificar la API de `bare-tty`.
+
+### Raw mode — ✅ VERIFICADO (spike 1)
+
+**`bare-tty` sí da raw mode.** Doc oficial: https://docs.pears.com/reference/bare/modules/bare-tty/
+Confirmado además en el código (`node_modules/bare-tty/index.js`) y probado end-to-end sobre
+Bare v1.29.4 con `bare-tty@5.1.2`. Ver `spikes/01-raw-input/`.
+
+```javascript
+const tty = require('bare-tty')
+
+const stdin = new tty.ReadStream(0)
+const stdout = new tty.WriteStream(1)
+
+stdin.setRawMode(true)                 // byte a byte, sin Enter, sin echo
+stdin.on('data', (chunk) => { ... })   // Readable de bare-stream: NO bloquea el loop
+stdin.setRawMode(false)                // restaurar
+```
+
+API: `ReadStream(fd)` con `setRawMode(bool)` / `setMode(n)` / `isTTY` / `fd`.
+`WriteStream(fd)` con `columns` / `rows` / `getWindowSize()` y evento `resize` (SIGWINCH).
+`tty.isTTY(fd)` y `tty.constants.mode.{NORMAL,RAW,IO}`.
+
+**Las flechas** llegan como secuencias ANSI de 3 bytes: `ESC [ A/B/C/D` = `1b5b41`..`1b5b44`.
+Un solo chunk puede traer varias teclas — hay que parsear el buffer entero, no asumir 1 tecla.
+
+### Los 3 gotchas de raw mode (todos verificados)
+
+1. **Ctrl+C NO es SIGINT.** Llega como el byte `0x03` y hay que manejarlo a mano. Un handler
+   `process.on('SIGINT')` **no se dispara** con raw mode activo. Sin esto la app es incerrable.
+2. **Restaurar la terminal siempre.** Si el proceso muere en raw mode, el shell del usuario
+   queda sin echo, inutilizable. Conviene un `restore()` idempotente llamado desde la tecla de
+   salida, el error handler y `Bare.on('exit')`.
+3. **Salir de un proceso long-lived necesita dos cosas**: cerrar la App (`app.exit(code)`) **y**
+   soltar todos los handles propios. Un `setInterval` vivo (el game loop, por ejemplo) mantiene
+   el loop y el proceso no termina nunca. Con el worker de `PearRuntime.run` activo,
+   `Bare.exit()` a secas se cuelga.
 
 **[NUESTRO]** Antes de meter una librería de TUI de npm (blessed, ink, etc.), asumir que **no** va
 a andar en Bare hasta probar lo contrario. Escapes ANSI a mano es la apuesta segura.
+
+### El binario `bare` del template es un wrapper
+
+`./node_modules/.bin/bare` es un script de **Node** que spawnea el binario real
+(`node_modules/bare-runtime-<platform>-<arch>/bin/bare`) como hijo, con `suppressSignals: true`
+— o sea registra handlers no-op para SIGTERM/SIGINT/SIGHUP.
+
+- **Ctrl+C en una terminal anda bien**: la señal va a todo el process group y el hijo la recibe.
+- **Matar por PID al wrapper no hace nada.** En scripts de test, usar el binario real.

@@ -107,11 +107,35 @@ Referencia completa en `docs/02-pear-cli.md` y `docs/03-deploy-ota.md`.
 
 ## Estado
 
-- [ ] Idea definida
-- [ ] Template clonado y corriendo
+### Riesgos técnicos — despejados ✅
+
+Ambos verificados con código corrible en `spikes/`. Ver `docs/README.md`.
+
+- [x] **Input en tiempo real en Bare** — `bare-tty` da raw mode. Flechas, espacio, Ctrl+C
+      limpio, y funciona dentro del template. → `spikes/01-raw-input/`
+- [x] **P2P con Hyperswarm** — discovery por nombre de sala, JSON con framing, detección de
+      desconexión, reconexión automática. → `spikes/02-hyperswarm/`
+
+**Un juego de terminal en tiempo real es viable.** Con dos condiciones de diseño no negociables:
+heartbeat de aplicación para detectar peers caídos, y retry del `join` (el discovery falla
+~30% al primer intento). Detalle en `docs/04-p2p.md`.
+
+### Pipeline — **NADA DE ESTO ESTÁ HECHO** 🔴
+
+Es la prioridad #1 del proyecto y sigue en cero. Un juego perfecto sin OTA no califica.
+
+- [ ] Definir **quién genera y seedea la key** (bloquea todo lo de abajo — sólo esa máquina
+      puede publicar la v2, y tiene que estar viva durante el juzgado)
+- [ ] Template clonado como proyecto real (por ahora sólo existe dentro de `spikes/`)
 - [ ] `pear://` link generado y seedeando
 - [ ] Binario buildeado (`npm run make`)
 - [ ] Instalado vía `pear install` en otra máquina
 - [ ] OTA verificado end-to-end
+
+### Resto
+
+- [ ] Idea definida (ya no bloquea nada: los dos riesgos están despejados)
+- [ ] Discovery probado **entre dos máquinas distintas** (lo medido fue en una sola,
+      que es el peor caso de NAT)
 - [ ] Lógica de la app
 - [ ] README + video demo
