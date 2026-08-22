@@ -54,12 +54,21 @@ function writeLog(line) {
 }
 
 // Pantalla + archivo.
+//
+// El console.log va en try/catch a propósito: si el proceso padre (npm, una tubería)
+// muere antes que nosotros, stdout queda roto y escribir tira EPIPE. Sin esto, esa
+// excepción rompe el handler de cierre y el proceso queda zombi en el swarm.
 function print(...args) {
   const line = args
     .map((a) => (typeof a === 'string' ? a : a instanceof Error ? a.stack : JSON.stringify(a)))
     .join(' ')
 
-  console.log(line)
+  try {
+    console.log(line)
+  } catch {
+    // stdout roto; seguimos, el archivo de log es la fuente de verdad
+  }
+
   writeLog(line)
 }
 
@@ -85,10 +94,52 @@ app.on('update-applied', () =>
 )
 app.on('error', (err) => print('[app:error]', err))
 
-process.on('SIGHUP', () => app.exit(129))
-process.on('SIGINT', () => app.exit(130))
-process.on('SIGQUIT', () => app.exit(131))
-process.on('SIGTERM', () => app.exit(143))
+// Cierre ordenado.
+//
+// El template original hacía `app.exit(code)` y confiaba en que el event loop se vaciara
+// solo. No alcanza: nuestro listener de stdin lo mantiene vivo, y el worker de Bare
+// (con sus dos swarms) puede tardar o quedarse colgado destruyéndose. Resultado: Ctrl+C
+// no cerraba nada y los procesos quedaban zombis en el swarm.
+//
+// Acá: cortamos stdin, damos un plazo acotado para el teardown limpio, y salimos sí o sí.
+const FORCE_EXIT_MS = 3000
+let closing = false
+
+async function shutdown(code, signal) {
+  if (closing) {
+    // Segundo Ctrl+C: el usuario quiere salir YA.
+    print(`\n[${signal}] forzando salida`)
+    Bare.exit(code)
+    return
+  }
+  closing = true
+
+  print(`\n[${signal}] cerrando… (Ctrl+C de nuevo para forzar)`)
+
+  try {
+    process.stdin.pause()
+  } catch {}
+
+  // Red de seguridad: si el teardown se cuelga, salimos igual.
+  const forced = setTimeout(() => {
+    print('[shutdown] timeout, saliendo a la fuerza')
+    Bare.exit(code)
+  }, FORCE_EXIT_MS)
+
+  try {
+    await app.close()
+  } catch (err) {
+    print('[shutdown:error]', err)
+  }
+
+  clearTimeout(forced)
+  Bare.exit(code)
+}
+
+process.on('SIGHUP', () => shutdown(129, 'SIGHUP'))
+process.on('SIGINT', () => shutdown(130, 'SIGINT'))
+process.on('SIGQUIT', () => shutdown(131, 'SIGQUIT'))
+process.on('SIGTERM', () => shutdown(143, 'SIGTERM'))
 
 try {
   await app.ready()

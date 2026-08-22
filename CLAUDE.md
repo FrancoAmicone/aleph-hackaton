@@ -90,6 +90,12 @@ Si el juego es una TUI que queda abierta → `main` o `single-thread`.
 - **`discovery.flushed()` resuelve cuando TU announce propagó, no cuando encontraste a alguien.**
   Confundir las dos cosas fue el origen del malentendido.
 - **Para el lobby del juego: mostrar "buscando jugadores…".** No asumir conexión instantánea.
+- 🧟 **Los procesos zombi falsean los tests.** Un proceso viejo en la misma sala reaparece como
+  "peer fantasma" — parece un bug o un mock, y es real. **Siempre `npm run ps` antes de concluir
+  algo de un test P2P**, y usar una sala distinta por prueba (`--room prueba-$(date +%s)`).
+  Limpiar con `npm run stop`. Ver `test-msg/docs/08-procesos-zombi.md`.
+- El cierre limpio no es cosmético: `app.exit()` solo no alcanza porque el listener de stdin
+  mantiene vivo el event loop. Hay que soltar stdin, acotar el teardown con timeout y salir explícito.
 
 ## Método para debuggear P2P (aprendido a la fuerza)
 

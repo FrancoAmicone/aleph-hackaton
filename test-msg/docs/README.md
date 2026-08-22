@@ -33,6 +33,7 @@ npm start -- --room hackaton --log /tmp/mi.log
 | `05-diagnostico-red.md` | Scripts para saber si un problema es de red o de código |
 | `06-logs-y-monitoreo.md` | `--log` + `tail -f` para ver todo en tiempo real |
 | `07-que-pasa-por-debajo.md` | DHT, hole punching, cifrado: cómo se conectan dos peers sin servidor |
+| `08-procesos-zombi.md` | **Peers "fantasma" y cierre limpio.** Leelo antes de sacar conclusiones de un test |
 
 ## Estado actual
 

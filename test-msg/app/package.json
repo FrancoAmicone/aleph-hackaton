@@ -18,7 +18,9 @@
     "make:win32-arm64": "bare-build --name test-msg --standalone --host win32-arm64 --out ./out/win32-arm64 bin.mjs",
     "make:win32-x64": "bare-build --name test-msg --standalone --host win32-x64 --out ./out/win32-x64 bin.mjs",
     "start:updates": "node node_modules/bare-runtime/bin/bare bin.mjs --updates",
-    "diag": "node diag-node.js"
+    "diag": "node diag-node.js",
+    "stop": "pkill -f 'bin.mjs' || true",
+    "ps": "ps -o pid=,command= -A | grep 'bin.mjs' | grep -v grep || echo 'no hay procesos test-msg corriendo'"
   },
   "dependencies": {
     "b4a": "^1.8.1",

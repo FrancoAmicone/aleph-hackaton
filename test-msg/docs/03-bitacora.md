@@ -350,6 +350,53 @@ sí incluido para que las instalaciones sean reproducibles.
 
 ---
 
+## 🔴 Error 7 — peers "fantasma" y Ctrl+C que no cierra
+
+Al probar el chat aparecieron **dos peers que nadie había levantado**:
+
+```
+* ddb727 entró a la sala (1 conectado/s)
+* b5262c entró a la sala (2 conectado/s)
+```
+
+**No estaba hardcodeado.** `ps` mostró **24 procesos** de tests anteriores todavía corriendo,
+el más viejo de 40 minutos antes. Dos de ellos estaban en la sala `hackaton` con el topic
+`c485632cfdef…` y sus IDs (`b5262c`, `ddb727`) eran exactamente los de la primera corrida de prueba.
+Peers reales, míos, zombis.
+
+### Causa raíz
+
+**El cierre estaba roto.** El template hacía `process.on('SIGINT', () => app.exit(130))`, que
+confía en que el event loop se vacíe solo. No se vacía: nuestro listener de `process.stdin` lo
+mantiene vivo. Mis `kill` mataban el shim de node y el proceso `bare` nieto seguía vivo.
+
+### Fix aplicado
+
+`shutdown()` que suelta stdin, da 3s de plazo al teardown y sale sí o sí; segundo Ctrl+C fuerza.
+`print()` blindado con try/catch (un EPIPE en `console.log` rompía el handler).
+Scripts nuevos: `npm run ps` y `npm run stop`.
+
+Detalle completo en `08-procesos-zombi.md`.
+
+### Verificación
+
+| Escenario | Resultado |
+|---|---|
+| SIGINT directo al proceso `bare` | ✅ 0 procesos quedan |
+| Vía `npm start`, SIGINT al proceso `bare` | ✅ 0 procesos quedan |
+| Ctrl+C real en terminal interactiva | ⬜ **falta verificar con una persona** |
+
+El último no se pudo automatizar: necesita un TTY con grupo de proceso en primer plano.
+Un intento de emularlo mandando SIGINT a los 3 procesos del árbol falló, pero es un artefacto
+del entorno de prueba (procesos en background sin TTY), no evidencia de que Ctrl+C falle.
+
+### Lección
+
+**Antes de sacar cualquier conclusión de un test P2P: `npm run ps`.**
+Y usar una sala distinta por prueba (`--room prueba-$(date +%s)`).
+
+---
+
 ## Pendientes inmediatos
 
 1. ⬜ Confirmar el chat **entre dos máquinas** (validación, no debug).
