@@ -21,7 +21,8 @@
     "diag": "node diag-node.js",
     "stop": "pkill -f 'bin.mjs' || true",
     "ps": "ps -o pid=,command= -A | grep 'bin.mjs' | grep -v grep || echo 'no hay procesos test-msg corriendo'",
-    "diag:p2p": "node diag-p2p.js"
+    "diag:p2p": "node diag-p2p.js",
+    "p2p": "node p2p-test.js"
   },
   "dependencies": {
     "b4a": "^1.8.1",
