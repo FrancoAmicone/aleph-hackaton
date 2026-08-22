@@ -1,0 +1,5 @@
+=== conectar.js nat — 2026-08-22T19:49:04.164Z ===
+[+0.0s] inicializando DHT…
+[+6.4s] DHT listo | host=200.80.213.210 port=52445 firewalled=true randomized=false
+[+6.4s] bootstrapped=true ephemeral=true
+[+6.4s] STATS inicial | punches consistent=0 random=0 open=0 | relaying attempts=0 successes=0 aborts=0
