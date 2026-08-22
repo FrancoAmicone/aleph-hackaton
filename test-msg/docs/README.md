@@ -36,7 +36,8 @@ npm start -- --room hackaton --log /tmp/mi.log
 | `08-procesos-zombi.md` | **Peers "fantasma" y cierre limpio.** Leelo antes de sacar conclusiones de un test |
 | `09-conexion-directa.md` | **`conectar.js` — P2P verificado entre máquinas reales.** El camino que funciona |
 | `10-caso-roman.md` | Lista de diagnóstico para la máquina que no conecta |
-| `11-pipeline-verificado.md` | **make → build → stage → seed, ejecutado de verdad.** Con la trampa del binario |
+| `11-pipeline-verificado.md` | **make → build → stage → seed, ejecutado de verdad.** Cross-compilación y la trampa del binario |
+| `12-ota-explicado.md` | **Cómo funciona el OTA, cómo probarlo y cómo debuggearlo** |
 
 ## Estado actual
 

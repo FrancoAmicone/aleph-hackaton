@@ -59,14 +59,46 @@ test-msg v1.0.0
 
 Es **standalone**: corre en una máquina sin Node ni npm.
 
-⚠️ Cada plataforma se compila en un host de esa plataforma. Repartir entre el equipo.
+### ✅ CROSS-COMPILA — la doc oficial se equivoca
+
+La doc dice "Build each platform's binary on a matching host". **Es falso.**
+Verificado: desde un **Mac ARM** salieron los binarios de las 5 plataformas.
+
+```bash
+npm run make:darwin-arm64    # Mach-O arm64        77 MB
+npm run make:darwin-x64      # Mach-O x64          84 MB
+npm run make:linux-x64       # ELF x86-64          94 MB
+npm run make:linux-arm64     # ELF aarch64         95 MB
+npm run make:win32-x64       # PE32+ .exe          54 MB
+```
+
+Comprobado con `file`:
+```
+out/linux-x64/test-msg      ELF 64-bit LSB pie executable, x86-64
+out/win32-x64/test-msg.exe  PE32+ executable (console) x86-64, for MS Windows
+```
+
+**Una sola máquina compila para todo el equipo.** No hace falta repartir.
+
+⚠️ En Windows el binario se llama `<nombre>.exe`, no `<nombre>`.
+⚠️ Lo que **no** está verificado es que esos binarios *corran* en sus plataformas.
+   Que Gino pruebe el de linux-x64 en su Ubuntu.
 
 ### 4. Armar la carpeta de deployment ← **EL PASO QUE FALTABA**
 ```bash
-pear build \
-  --package=./package.json \
+# una plataforma
+pear build --package=./package.json \
   --darwin-arm64-app ./out/darwin-arm64/<nombre> \
   --target ./deploy-1.0.0
+
+# TODAS de una (lo que conviene)
+pear build --package=./package.json \
+  --darwin-arm64-app ./out/darwin-arm64/<nombre> \
+  --darwin-x64-app   ./out/darwin-x64/<nombre> \
+  --linux-x64-app    ./out/linux-x64/<nombre> \
+  --linux-arm64-app  ./out/linux-arm64/<nombre> \
+  --win32-x64-app    ./out/win32-x64/<nombre>.exe \
+  --target ./deploy-multi
 ```
 
 ⚠️ **`--<plat>-app` apunta al BINARIO**, no a un `.app` de Electron. La doc oficial muestra el
@@ -124,9 +156,9 @@ ni actualizar. Terminal dedicada, laptop sin suspensión, y conviene un segundo 
 | Paso | Estado |
 |---|---|
 | `pear touch` | ✅ `pear://9nbjjp5jmtxxq3jj8ko7z4sdfnohucgwyjsxspdpsnuc8yf136my` |
-| `npm run make` | ✅ darwin-arm64, 77 MB, corre |
-| `pear build` | ✅ `deploy-1.0.0/` |
-| `pear stage` | ✅ versión `0.3.` |
+| `npm run make` | ✅ **5 plataformas cross-compiladas desde el Mac** |
+| `pear build` | ✅ `deploy-multi/by-arch/<5 plataformas>/app/` |
+| `pear stage` v1.0.0 (5 plataformas) | ✅ versión `0.7.` |
 | `pear seed` | ✅ corriendo y anunciado |
 | `pear install` desde otra máquina | ⬜ **falta** |
 | OTA v1 → v2 | ⬜ **falta** |

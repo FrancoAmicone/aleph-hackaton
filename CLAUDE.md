@@ -177,9 +177,11 @@ Prioridad #1. Un juego perfecto sin OTA no califica.
 
 - [ ] Definir **quién genera y seedea la key definitiva** (bloquea todo lo de abajo — sólo esa
       máquina puede publicar la v2, y tiene que estar viva durante el juzgado)
-- [ ] Binario buildeado (`npm run make`) — `out/` no existe todavía
-- [ ] `pear stage`
-- [ ] `pear seed` corriendo
+- [x] Binarios buildeados — **5 plataformas cross-compiladas desde el Mac**
+      (darwin-arm64/x64, linux-x64/arm64, win32-x64). La doc oficial dice que no se puede: se puede.
+- [x] `pear build` → `deploy-multi/` (⚠️ **paso obligatorio**: stagear `out/` publica SIN el binario)
+- [x] `pear stage` → `pear://0.7.9nbjj…`
+- [x] `pear seed` corriendo (levanta versiones nuevas solo, no hay que reiniciarlo)
 - [ ] Instalado vía `pear install` en otra máquina
 - [ ] OTA verificado end-to-end (v1 corriendo → release v2 → se actualiza sola)
 
