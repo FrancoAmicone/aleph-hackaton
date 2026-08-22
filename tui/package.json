@@ -1,0 +1,45 @@
+{
+  "name": "truco-argentino",
+  "productName": "truco",
+  "version": "1.0.3",
+  "description": "Gran Truco Argentino — a terminal Truco game on Bare, delivered and updated peer-to-peer with Pear.",
+  "private": true,
+  "bin": "bin.js",
+  "upgrade": "pear://izkyzf8cdezbqb6hxqxnmg8584y1c5o5aj5c47x5ui7fdo5zd5co",
+  "scripts": {
+    "format": "prettier . --write",
+    "test": "brittle-bare test/index.js",
+    "lint": "prettier . --check && lunte",
+    "start": "bare bin.js --no-updates",
+    "make": "node scripts/make.js",
+    "deploy": "node scripts/deploy.js",
+    "make:darwin-arm64": "bare-build --name truco --standalone --host darwin-arm64 --out ./out/darwin-arm64 bin.js",
+    "make:darwin-x64": "bare-build --name truco --standalone --host darwin-x64 --out ./out/darwin-x64 bin.js",
+    "make:linux-arm64": "bare-build --name truco --standalone --host linux-arm64 --out ./out/linux-arm64 bin.js",
+    "make:linux-x64": "bare-build --name truco --standalone --host linux-x64 --out ./out/linux-x64 bin.js",
+    "make:win32-arm64": "bare-build --name truco --standalone --host win32-arm64 --out ./out/win32-arm64 bin.js",
+    "make:win32-x64": "bare-build --name truco --standalone --host win32-x64 --out ./out/win32-x64 bin.js"
+  },
+  "dependencies": {
+    "bare-os": "^3.9.0",
+    "bare-path": "^3.0.0",
+    "bare-storage": "^1.1.0",
+    "corestore": "^7.9.2",
+    "hyperswarm": "^4.17.0",
+    "paparam": "^1.10.1",
+    "pear-runtime": "1.1.1",
+    "which-runtime": "^1.4.0"
+  },
+  "overrides": {
+    "bare-sidecar": "0.4.6"
+  },
+  "devDependencies": {
+    "bare-build": "^0.5.3",
+    "bare-runtime": "^1.29.4",
+    "brittle": "^3.19.0",
+    "lunte": "^1.2.0",
+    "prettier": "^3.6.2",
+    "prettier-config-holepunch": "^2.0.0"
+  },
+  "license": "Apache-2.0"
+}
