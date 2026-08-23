@@ -301,6 +301,68 @@ test('resultado: gana el que gana, no siempre el asiento 0', (t) => {
   t.ok(desde(0).includes('gino ran out of cards first'), 'y el otro perdió')
 })
 
+test('resultado: a win opens with fireworks, then reveals; a key skips them', (t) => {
+  const { showFrames } = require('../lib/ui/result')
+  const FRAMES = showFrames(true)
+  const RAIN = showFrames(false)
+  const roster = [
+    { name: 'franco', isAI: false, level: 'normal' },
+    { name: 'gino', isAI: false, level: 'normal' }
+  ]
+  const game = new Game({ players: roster, rng: seeded(5) })
+  game.phase = 'game-over'
+  game.lastRound = { winner: 1, points: 12 }
+  game.hands[1] = []
+
+  const at = (age, me) => renderResult(game, { ...view, me, age })
+
+  // While the show is on: canvas-sized, something lit. Nothing of the result
+  // during the climb; it comes through with the burst and is all there by
+  // the end.
+  for (const age of [0, 5, 12, FRAMES - 1]) {
+    const frame = at(age, 1)
+    t.is(lines(frame).length, CANVAS.height, `age ${age}: canvas rows`)
+    t.is(widest(frame), CANVAS.width, `age ${age}: canvas columns`)
+  }
+  for (const age of [0, 5]) {
+    t.absent(stripAnsi(at(age, 1)).includes('before anyone else'), `age ${age}: not revealed`)
+  }
+  t.ok(
+    stripAnsi(at(FRAMES - 1, 1)).includes('before anyone else'),
+    'revealed before the sparks die'
+  )
+  t.is(at(FRAMES, 1), at(undefined, 1), 'and the last frame is the plain result')
+  t.ok(stripAnsi(at(5, 1)).trim().length > 0, 'the sky is not empty')
+  t.not(stripAnsi(at(5, 1)), stripAnsi(at(12, 1)), 'and it moves')
+  t.ok(stripAnsi(at(FRAMES, 1)).includes('before anyone else'), 'revealed when the show ends')
+  t.ok(stripAnsi(at(undefined, 1)).includes('before anyone else'), 'no age, no show')
+
+  // The loser gets rain instead: same rules, the result shows through at the end.
+  for (const age of [0, 10, 30, RAIN - 1]) {
+    const frame = at(age, 0)
+    t.is(lines(frame).length, CANVAS.height, `rain ${age}: canvas rows`)
+    t.is(widest(frame), CANVAS.width, `rain ${age}: canvas columns`)
+  }
+  t.absent(stripAnsi(at(0, 0)).includes('ran out of cards first'), 'rain: not revealed at first')
+  t.ok(stripAnsi(at(10, 0)).trim().length > 0, 'rain: it is raining')
+  t.ok(stripAnsi(at(RAIN, 0)).includes('ran out of cards first'), 'rain: revealed when it stops')
+  t.is(at(RAIN, 0), at(undefined, 0), 'rain: and the last frame is the plain result')
+
+  // Through the app: the clock starts on arrival and a key jumps it forward.
+  const model = app({ think: { canto: 0, play: 0, deal: 0, say: 0 } })
+  model.game = game
+  model.me = 1
+  model.frame = 40
+  model._showResult()
+  t.is(model._resultAge(), 0, 'fresh on arrival')
+  model.update({ type: 'frame' })
+  t.is(model._resultAge(), 1, 'ages with the loop')
+  t.absent(stripAnsi(model.view()).includes('before anyone else'), 'still the show')
+  model.update(press('enter'))
+  t.is(model.screen, 'result', 'the key did not leave the screen')
+  t.ok(stripAnsi(model.view()).includes('before anyone else'), 'it skipped to the result')
+})
+
 test('comandos: son los del jugador local, no los del asiento 0', (t) => {
   // La línea de comandos hacía `game.legalActions(0)`. Online eso mostraba
   // siempre lo que podía hacer el anfitrión: el que jugaba un comodín no veía

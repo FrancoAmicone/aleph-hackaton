@@ -7,6 +7,16 @@
 const { style } = require('../tea')
 const { CANVAS, pad, fit } = require('./canvas')
 const { WHITE } = require('./palette')
+const fireworks = require('./fireworks')
+const rain = require('./rain')
+
+// Both shows run on the same fast clock.
+const SHOW_MS = fireworks.SHOW_MS
+
+// How long the opening show is, for a win or a loss.
+function showFrames(won) {
+  return won ? fireworks.FRAMES : rain.FRAMES
+}
 
 // One tone per row of the 5-row headline.
 const WIN_RAMP = [226, 190, 154, 118, 82]
@@ -125,7 +135,15 @@ function renderResult(game, view) {
   // Count rows, not entries: the headline and the buttons are several rows each.
   const body = lines.join('\n')
   const spare = Math.max(0, CANVAS.height - body.split('\n').length)
-  return fit('\n'.repeat(Math.floor(spare / 2)) + body)
+  const final = fit('\n'.repeat(Math.floor(spare / 2)) + body)
+
+  // A win opens with fireworks and a loss with rain, both drawn over the
+  // finished result and letting it through as they go. `age` is frames since
+  // the screen came up; undefined means no animation.
+  if (view.age === undefined) return final
+  if (won && view.age < fireworks.FRAMES) return fireworks.fireworks(view.age, final)
+  if (!won && view.age < rain.FRAMES) return rain.rain(view.age, final)
+  return final
 }
 
-module.exports = { renderResult, BUTTONS, bigText }
+module.exports = { renderResult, BUTTONS, bigText, showFrames, SHOW_MS }

@@ -10,7 +10,7 @@ const { fromSeed } = require('../rng')
 const ai = require('../uno/ai')
 const { renderGame } = require('./screen')
 const { renderMenu, renderRules, MENU_ITEMS } = require('./menu')
-const { renderResult, BUTTONS } = require('./result')
+const { renderResult, BUTTONS, showFrames, SHOW_MS } = require('./result')
 const { renderBoot, BOOT_FRAMES } = require('./boot')
 const { renderIntro, INTRO_FRAMES } = require('./intro')
 const { fit, centre, tooSmall, tooSmallFor } = require('./canvas')
@@ -50,6 +50,8 @@ class App {
 
     this.screen = 'menu' // menu | rules | game | result
     this.resultIndex = 0
+    // The frame the result screen came up on, so it knows how old it is.
+    this.resultAt = 0
     this.width = 80
     this.height = 24
 
@@ -103,9 +105,20 @@ class App {
 
   _animate() {
     if (!this._animating()) return null
-    // The deal gets its own faster clock; everything else runs at FRAME_MS.
-    const ms = this.dealing !== null ? DEAL_FRAME_MS : FRAME_MS
+    // The deal and the result fireworks each run on a faster clock than the
+    // rest of the UI; everything else (menu, boot, intro) runs at FRAME_MS.
+    let ms = FRAME_MS
+    if (this.dealing !== null) ms = DEAL_FRAME_MS
+    else if (this._showing()) ms = SHOW_MS
     return tick(ms, () => ({ type: 'frame' }))
+  }
+
+  // True while the result screen's opening show — fireworks for a win, rain
+  // for a loss — is still going.
+  _showing() {
+    if (this.screen !== 'result' || !this.game) return false
+    const age = this._resultAge()
+    return age !== undefined && age < showFrames(this.game.winner() === this.me)
   }
 
   // --- lifecycle -------------------------------------------------------
@@ -202,8 +215,7 @@ class App {
     game.apply(action)
     this.selected = Math.min(this.selected, Math.max(0, game.hands[this.me].length - 1))
     if (game.isOver()) {
-      this.screen = 'result'
-      this.resultIndex = 0
+      this._showResult()
       return this._animate()
     }
 
@@ -211,6 +223,20 @@ class App {
     const clear = line ? tick(linger, () => ({ type: 'unsay', seat, tag: ++this._sayTag })) : null
     const next = this._maybeAI()
     return [clear, next].filter(Boolean)
+  }
+
+  // The result screen, fresh: first button focused, clock started for the
+  // fireworks a win opens with.
+  _showResult() {
+    this.screen = 'result'
+    this.resultIndex = 0
+    this.resultAt = this.frame
+  }
+
+  // Frames since the result came up. Undefined when nothing animates (tests),
+  // so the result is simply shown.
+  _resultAge() {
+    return this.think.frame === 0 ? undefined : this.frame - this.resultAt
   }
 
   // --- update ----------------------------------------------------------
@@ -335,8 +361,7 @@ class App {
         this.game.apply(e.action)
         this.selected = Math.min(this.selected, Math.max(0, this.game.hands[this.me].length - 1))
         if (this.game.isOver()) {
-          this.screen = 'result'
-          this.resultIndex = 0
+          this._showResult()
         }
         return [this, this._animate()]
       }
@@ -463,6 +488,11 @@ class App {
   }
 
   _resultKey(msg) {
+    // Any key during the fireworks skips them: the clock jumps to the end.
+    if (this._showing()) {
+      this.resultAt = this.frame - showFrames(this.game.winner() === this.me)
+      return [this, null]
+    }
     if (key.matches(msg, 'left', 'right', 'h', 'l', 'up', 'down', 'k', 'j', 'tab')) {
       this.resultIndex = this.resultIndex === 0 ? 1 : 0
       return [this, null]
@@ -513,8 +543,7 @@ class App {
 
     if (game.phase === 'game-over') {
       // The result screen takes over; any key gets you there.
-      this.screen = 'result'
-      this.resultIndex = 0
+      this._showResult()
       return [this, this._animate()]
     }
 
@@ -617,8 +646,7 @@ class App {
     this.game.apply(action)
     this.selected = Math.min(this.selected, Math.max(0, this.game.hands[this.me].length - 1))
     if (this.game.isOver()) {
-      this.screen = 'result'
-      this.resultIndex = 0
+      this._showResult()
       return this._animate()
     }
     return this._maybeAI()
@@ -654,7 +682,11 @@ class App {
             : this.screen === 'rules'
               ? fit(renderRules())
               : this.screen === 'result'
-                ? renderResult(this.game, { ...shared, index: this.resultIndex })
+                ? renderResult(this.game, {
+                    ...shared,
+                    index: this.resultIndex,
+                    age: this._resultAge()
+                  })
                 : renderGame(this.game, {
                     ...shared,
                     selected: this.selected,
