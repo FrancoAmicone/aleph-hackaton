@@ -419,7 +419,7 @@ function renderHeader(game, view, width) {
 }
 
 // Everyone's score on one line — there are no teams in UNO.
-function renderScore(game, width) {
+function renderScore(game, width, view = {}) {
   const fewest = Math.min(...game.hands.map((h) => h.length))
   const parts = game.players.map((p, seat) => {
     const n = game.hands[seat].length
@@ -431,7 +431,11 @@ function renderScore(game, width) {
   })
 
   const left = ' ' + parts.join(style().faint(true).render('  ·  '))
-  const right = style().faint(true).render('cartas en mano ')
+  const right = view.updateStatus
+    ? style()
+        .foreground(view.updateStatus.color)
+        .render(view.updateStatus.text + ' ')
+    : style().faint(true).render('cartas en mano ')
   const room = width - style.width(left) - style.width(right)
   return left + ' '.repeat(Math.max(1, room)) + right
 }
@@ -577,9 +581,11 @@ function renderGame(game, view) {
   const ultimo = last ? style().foreground(WHITE).render(style.truncate(last.text, 70)) : ''
   const top = turno + '   ' + style().faint(true).render('·') + '   ' + ultimo
 
+  // No header: the title and version are menu chrome, not table state. The
+  // updater status it used to carry rides on the score line instead, so an
+  // OTA notice can still reach the player mid-game.
   const body = stack(
-    renderHeader(game, view, width),
-    renderScore(game, width),
+    renderScore(game, width, view),
     '',
     pad(top, width),
     '',
