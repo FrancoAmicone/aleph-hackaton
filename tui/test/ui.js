@@ -53,16 +53,18 @@ async function step(model, msg) {
   return model
 }
 
+// Runs a Cmd chain to completion — except frames. An animation tick re-arms
+// itself forever (that is what keeps the bars moving), so following it would
+// never return. Tests that care about animation drive frames by hand.
 async function runCmd(model, cmd) {
   if (!cmd) return
   const cmds = Array.isArray(cmd) ? cmd : [cmd]
   for (const c of cmds) {
     if (!c) continue
     const msg = await c()
-    if (msg && msg.type !== 'quit') {
-      const [, next] = model.update(msg)
-      await runCmd(model, next)
-    }
+    if (!msg || msg.type === 'quit' || msg.type === 'frame') continue
+    const [, next] = model.update(msg)
+    await runCmd(model, next)
   }
 }
 
@@ -148,9 +150,9 @@ test('the canvas holds its size through a whole round', async (t) => {
   const rng = seeded(77)
   let guard = 0
 
-  // One round is the unit under test — a full game to 500 points is many
-  // rounds and thousands of steps, which the engine fuzz already covers.
-  while (model.game && !model.game.isOver() && model.game.roundNumber < 2 && guard++ < 600) {
+  // One hand is the whole game now, so this runs until someone goes out — and
+  // stops the moment the model leaves the table for the result screen.
+  while (model.game && !model.game.isOver() && model.screen === 'game' && guard++ < 600) {
     const frame = model.view()
     if (widest(frame) !== CANVAS.width || lines(frame).length !== CANVAS.height) {
       t.fail(`canvas changed size: ${widest(frame)}x${lines(frame).length}`)
@@ -158,10 +160,6 @@ test('the canvas holds its size through a whole round', async (t) => {
     }
 
     const game = model.game
-    if (game.phase === 'round-over') {
-      await step(model, press('enter'))
-      continue
-    }
     if (game.currentActor() !== 0) {
       await step(model, { type: 'ai' })
       continue
@@ -192,8 +190,9 @@ test('the canvas holds its size through a whole round', async (t) => {
     }
   }
 
-  t.ok(guard < 600, 'the round progressed rather than stalling')
-  t.ok(model.game.roundNumber >= 1, 'at least one round was dealt')
+  t.ok(guard < 600, 'the hand progressed rather than stalling')
+  t.ok(model.game.isOver(), 'and it ran all the way to someone going out')
+  t.is(model.screen, 'result', 'which lands on the result screen')
   t.ok(guard > 5, `and it took real turns to get there (${guard})`)
 })
 
@@ -300,7 +299,7 @@ test('mesa: the table is a piece of furniture, not a floating box', (t) => {
   const plain = stripAnsi(renderMesa(game, view))
 
   // Top, rim, two leg rows, floor, shadow — in that order, each on its own row.
-  const order = ['╰', '▀▀▀', '║', '║', '╨', '░░░']
+  const order = ['╰', '║', '║', '╨', '░░░']
   let at = -1
   for (const mark of order) {
     const next = plain.indexOf(mark, at + 1)
@@ -368,7 +367,6 @@ test('partida: reports only what the score line does not', (t) => {
   const drawn = stripAnsi(partidaLines(game))
 
   t.ok(/Turno\s+Vos/.test(drawn), 'whose turn it is')
-  t.ok(/Ronda\s+1/.test(drawn), 'the round')
   t.ok(/Tu mano\s+1/.test(drawn), 'and how many cards you hold')
 })
 

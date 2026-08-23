@@ -31,11 +31,6 @@ function playOut(game, rng) {
   while (!game.isOver()) {
     if (steps++ > 60000) return { deadlock: true, steps }
 
-    if (game.phase === 'round-over') {
-      game.nextRound()
-      continue
-    }
-
     // Somebody may owe a UNO call even when it is not their turn.
     const seat = game.currentActor()
     if (seat === null) return { deadlock: true, steps }
@@ -149,17 +144,20 @@ test('fuzz: 200 four-handed games finish cleanly', (t) => {
       t.fail(`seed ${seed}: illegal action ${JSON.stringify(result.illegal)}`)
       return
     }
-    if (Math.max(...game.scores) < game.target) {
-      t.fail(`seed ${seed}: ended below the target — ${game.scores.join('/')}`)
+    const winner = game.winner()
+    if (winner === null || game.hands[winner].length !== 0) {
+      t.fail(
+        `seed ${seed}: ended without anyone going out — ${game.hands.map((h) => h.length).join('/')}`
+      )
       return
     }
 
-    rounds += game.roundNumber
+    rounds += 1
     steps += result.steps
   }
 
-  t.pass(`200 games, ${rounds} rounds, ${steps} actions — all legal and terminating`)
-  t.ok(rounds / 200 > 2, 'a game takes more than a couple of rounds')
+  t.pass(`200 games, ${steps} actions — all legal, all ended on an empty hand`)
+  t.ok(steps / 200 > 10, 'a game takes real turns, not one')
 })
 
 test('fuzz: cards are conserved — hands plus piles always make 88', (t) => {
@@ -167,10 +165,6 @@ test('fuzz: cards are conserved — hands plus piles always make 88', (t) => {
   const rng = seeded(99)
 
   for (let i = 0; i < 4000 && !game.isOver(); i++) {
-    if (game.phase === 'round-over') {
-      game.nextRound()
-      continue
-    }
     const seat = game.currentActor()
     if (seat === null) break
 
@@ -184,26 +178,26 @@ test('fuzz: cards are conserved — hands plus piles always make 88', (t) => {
   t.pass('no card was ever lost or duplicated')
 })
 
-test('fuzz: scores only ever come from cards left in hand', (t) => {
-  const game = aiGame(7, 'normal', 200)
-  const rng = seeded(11)
-  let guard = 0
-
-  while (!game.isOver() && guard++ < 20000) {
-    if (game.phase === 'round-over') {
-      const { winner, points } = game.lastRound
-      t.ok(points >= 0, 'a round never scores negative')
-      t.ok(winner >= 0 && winner < game.playerCount, 'and the winner is at the table')
-      game.nextRound()
-      continue
+test('fuzz: the winner banks exactly what the losers were holding', (t) => {
+  const { value } = require('../lib/uno/deck')
+  for (let seed = 1; seed <= 40; seed++) {
+    const game = aiGame(seed)
+    const result = playOut(game, seeded(seed * 31))
+    if (result.deadlock || result.illegal) {
+      t.fail(`seed ${seed}: ${result.deadlock ? 'deadlock' : 'illegal action'}`)
+      return
     }
-    const seat = game.currentActor()
-    if (seat === null) break
-    game.apply(decide(game, seat, rng))
+    const winner = game.winner()
+    let held = 0
+    for (let seat = 0; seat < game.playerCount; seat++) {
+      if (seat !== winner) for (const c of game.hands[seat]) held += value(c)
+    }
+    if (game.scores[winner] !== held) {
+      t.fail(`seed ${seed}: winner scored ${game.scores[winner]} but losers held ${held}`)
+      return
+    }
   }
-
-  const highest = Math.max(...game.scores)
-  t.ok(highest >= 200, `the game ran to the target (${highest})`)
+  t.pass('40 games: every score equals the cards left in the losing hands')
 })
 
 test('chatter: gives the loud cards a line', (t) => {

@@ -33,7 +33,9 @@ class Game {
       level: p.level || 'normal'
     }))
     this.playerCount = this.players.length
-    this.target = opts.target || 500
+    // One hand is the whole game: going out wins it. Any points at all
+    // clear the target, so the first player to empty their hand takes it.
+    this.target = opts.target || 1
     this.rng = opts.rng || Math.random
 
     this.scores = new Array(this.playerCount).fill(0)
@@ -62,11 +64,7 @@ class Game {
 
   winner() {
     if (!this.isOver()) return null
-    let best = 0
-    for (let i = 1; i < this.playerCount; i++) {
-      if (this.scores[i] > this.scores[best]) best = i
-    }
-    return best
+    return this.lastRound.winner
   }
 
   // The seat that plays after `seat`. No Reverse in this deck, so it is always
@@ -107,7 +105,7 @@ class Game {
     this.unoWindow = null // { seat } while someone sits on one card uncalled
     this.lastRound = null
 
-    this._log('deal', null, `Ronda ${this.roundNumber} — reparte ${this.players[this.dealer].name}`)
+    this._log('deal', null, `Reparte ${this.players[this.dealer].name}`)
 
     // A +2 turned up at the start applies to the first player.
     if (first.rank === DRAW_TWO) {
@@ -345,14 +343,13 @@ class Game {
 
     this.scores[winner] += points
     this.unoWindow = null
-    this.phase = 'round-over'
     this.lastRound = { winner, points }
     this._log('score', winner, `${this.players[winner].name} se va con ${points} puntos`)
 
-    if (this.scores[winner] >= this.target) {
-      this.phase = 'game-over'
-      this._log('over', winner, `¡${this.players[winner].name} gana la partida!`)
-    }
+    // Emptying your hand wins the game outright — the whole game is one hand.
+    // Points are kept for the result screen, not to decide anything.
+    this.phase = 'game-over'
+    this._log('over', winner, `¡${this.players[winner].name} gana la partida!`)
     return this
   }
 

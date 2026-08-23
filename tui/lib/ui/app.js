@@ -9,6 +9,7 @@ const { Game } = require('../uno/engine')
 const ai = require('../uno/ai')
 const { renderGame } = require('./screen')
 const { renderMenu, renderRules, MENU_ITEMS } = require('./menu')
+const { renderResult, BUTTONS } = require('./result')
 const { fit, centre, tooSmall, tooSmallFor } = require('./canvas')
 
 // How long the rivals "think", in ms.
@@ -33,7 +34,8 @@ class App {
     // Tests set this to 0 so a whole hand plays out without real delays.
     this.think = opts.think || { canto: THINK_CANTO, play: THINK_PLAY }
 
-    this.screen = 'menu' // menu | rules | game
+    this.screen = 'menu' // menu | rules | game | result
+    this.resultIndex = 0
     this.width = 80
     this.height = 24
 
@@ -68,7 +70,7 @@ class App {
   // for a still picture.
   _animating() {
     if (this.think.frame === 0) return false
-    if (this.screen === 'menu') return true
+    if (this.screen === 'menu' || this.screen === 'result') return true
     if (this.screen !== 'game' || !this.game) return false
     return this.dealing !== null || this.game.currentActor() !== 0
   }
@@ -122,7 +124,7 @@ class App {
   // Hand the turn to the AI if it is theirs, as a delayed Cmd.
   _maybeAI() {
     const game = this.game
-    if (!game || game.phase === 'round-over' || game.phase === 'game-over') return null
+    if (!game || game.phase === 'game-over') return null
     if (this.dealing !== null) return null
 
     const seat = game.currentActor()
@@ -146,6 +148,11 @@ class App {
 
     game.apply(action)
     this.selected = Math.min(this.selected, Math.max(0, game.hands[0].length - 1))
+    if (game.isOver()) {
+      this.screen = 'result'
+      this.resultIndex = 0
+      return this._animate()
+    }
 
     const linger = typeof this.think.say === 'number' ? this.think.say : CLEAR_SAY
     const clear = line ? tick(linger, () => ({ type: 'unsay', seat, tag: ++this._sayTag })) : null
@@ -217,6 +224,7 @@ class App {
     if (key.matches(msg, 'ctrl+c')) return [this, quit]
 
     if (this.screen === 'menu') return this._menuKey(msg)
+    if (this.screen === 'result') return this._resultKey(msg)
     if (this.screen === 'rules') {
       if (key.matches(msg, 'escape', 'enter', 'q', 'r')) this.screen = 'menu'
       return [this, null]
@@ -247,6 +255,25 @@ class App {
       return [this, null]
     }
 
+    return [this, null]
+  }
+
+  _resultKey(msg) {
+    if (key.matches(msg, 'left', 'right', 'h', 'l', 'up', 'down', 'k', 'j', 'tab')) {
+      this.resultIndex = this.resultIndex === 0 ? 1 : 0
+      return [this, null]
+    }
+    if (key.matches(msg, 'escape', 'q')) {
+      this.screen = 'menu'
+      this.game = null
+      return [this, this._animate()]
+    }
+    if (key.matches(msg, 'enter', 'space')) {
+      if (BUTTONS[this.resultIndex].id === 'rematch') return [this, this.startGame()]
+      this.screen = 'menu'
+      this.game = null
+      return [this, this._animate()]
+    }
     return [this, null]
   }
 
@@ -281,23 +308,10 @@ class App {
     if (this.dealing !== null) return [this, null]
 
     if (game.phase === 'game-over') {
-      if (key.matches(msg, 'enter', 'space')) {
-        this.screen = 'menu'
-        this.game = null
-        return [this, this._animate()]
-      }
-      return [this, null]
-    }
-
-    if (game.phase === 'round-over') {
-      if (key.matches(msg, 'enter', 'space')) {
-        game.nextRound()
-        this.says = {}
-        this.selected = 0
-        this.message = null
-        return [this, this._startDeal()]
-      }
-      return [this, null]
+      // The result screen takes over; any key gets you there.
+      this.screen = 'result'
+      this.resultIndex = 0
+      return [this, this._animate()]
     }
 
     // Shouting UNO happens out of turn — to save yourself, or to catch a rival
@@ -390,6 +404,11 @@ class App {
 
     this.game.apply(action)
     this.selected = Math.min(this.selected, Math.max(0, this.game.hands[0].length - 1))
+    if (this.game.isOver()) {
+      this.screen = 'result'
+      this.resultIndex = 0
+      return this._animate()
+    }
     return this._maybeAI()
   }
 
@@ -412,14 +431,16 @@ class App {
           })
         : this.screen === 'rules'
           ? fit(renderRules())
-          : renderGame(this.game, {
-              ...shared,
-              selected: this.selected,
-              says: this.says,
-              message: this.message,
-              dealt: this.dealing ? this.dealing.landed : undefined,
-              flight: this.dealing ? this.dealing.age / DEAL_FRAMES : undefined
-            })
+          : this.screen === 'result'
+            ? renderResult(this.game, { ...shared, index: this.resultIndex })
+            : renderGame(this.game, {
+                ...shared,
+                selected: this.selected,
+                says: this.says,
+                message: this.message,
+                dealt: this.dealing ? this.dealing.landed : undefined,
+                flight: this.dealing ? this.dealing.age / DEAL_FRAMES : undefined
+              })
 
     return centre(canvas, this.width, this.height)
   }

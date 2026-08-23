@@ -262,8 +262,9 @@ test('scoring: the winner banks what everyone else still holds', (t) => {
 
   // 9 + 5 + 20 + 50
   t.is(game.scores[0], 84, 'face values, +2 is 20, +4 is 50')
-  t.is(game.phase, 'round-over', 'the round ended')
+  t.is(game.phase, 'game-over', 'going out ends the game — the game is one hand')
   t.alike(game.lastRound, { winner: 0, points: 84 }, 'and it is recorded')
+  t.is(game.winner(), 0, 'the winner is whoever went out, not whoever has most points')
 })
 
 test('scoring: card values', (t) => {

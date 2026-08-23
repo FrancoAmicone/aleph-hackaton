@@ -13,7 +13,7 @@
 const { style } = require('../tea')
 const cards = require('./cards')
 const { SKY, LIGHT, BLUE, MID, STRONG, WHITE, CARD_COLORS } = require('./palette')
-const { CANVAS, COLUMNS, pad, fit } = require('./canvas')
+const { CANVAS, pad, fit } = require('./canvas')
 
 // Frames of the spinner shown while the rivals are thinking.
 const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
@@ -25,7 +25,6 @@ const FLANK = 12
 // the shadow — none of them a card colour, so the table never looks like a
 // card.
 const WOOD = 130 // #af5f00
-const WOOD_DARK = 94 // #875f00
 const FLOOR = 238 // #444444
 const SHADOW = 236 // #303030
 
@@ -127,7 +126,7 @@ function flankLine(game, seat, view, align) {
 // stays put whether or not it has a ¡UNO! or a speech bubble that frame.
 function flankBeside(game, seat, view, align) {
   const rows = flankLine(game, seat, view, align).split('\n')
-  const feltRows = 7 // border + 4 content rows + stack line + border
+  const feltRows = TABLE_ROWS
   const top = Math.max(0, Math.floor((feltRows - rows.length) / 2))
   const out = []
   for (let i = 0; i < top; i++) out.push(' '.repeat(FLANK))
@@ -140,48 +139,78 @@ function flankBeside(game, seat, view, align) {
 // The middle of the table: the draw pile, the discard pile, and the colour in
 // play — which after a +4 is not the colour of the card showing, so it gets a
 // swatch of its own rather than being left to inference.
+// The table is round: an ellipse drawn row by row, the felt inside it. Each
+// row's half-width comes from the ellipse equation, so the edge is smooth at
+// the top and bottom and widest in the middle, where the cards sit.
+const TABLE_ROWS = 13
+const TABLE_HALF_W = 23 // half the width at the widest row
+
+function tableRowHalfWidth(row) {
+  const a = TABLE_HALF_W
+  const b = (TABLE_ROWS - 1) / 2
+  const y = row - b
+  const x = a * Math.sqrt(Math.max(0, 1 - (y * y) / (b * b)))
+  return Math.max(2, Math.round(x))
+}
+
 function feltBlock(game, view) {
-  const inner = FELT - 2
-  const W = 14
+  const width = TABLE_HALF_W * 2
+  const dealing = view.dealt !== undefined
 
-  // Three columns of exactly four rows, so they line up whatever is in them.
-  const column = (title, body) => {
-    const lines = [pad(style().faint(true).render(title), W)]
-    for (const line of String(body).split('\n')) lines.push(pad(line, W))
-    while (lines.length < 4) lines.push(' '.repeat(W))
-    return lines.slice(0, 4).join('\n')
+  // What goes on the felt, centred: the pile, the discard (full size), the
+  // colour chip — one block, then laid over the ellipse rows.
+  const pileCount = dealing
+    ? game.draw.length + (game.playerCount * 5 - view.dealt)
+    : game.draw.length
+  const mazo = stack(
+    pad(style().faint(true).render(`MAZO ${pileCount}`), 9),
+    pad(cards.bigBack(), 9)
+  )
+  const descarte = stack(
+    pad(style().faint(true).render('DESCARTE'), 9),
+    pad(dealing ? cards.bigBack() : cards.big(game.top), 9)
+  )
+  const colorLabel = dealing ? '—' : game.activeColor || '—'
+  const color = stack(
+    pad(style().faint(true).render('COLOR'), 9),
+    '',
+    pad(cards.colorChip(dealing ? null : game.activeColor), 9),
+    pad(
+      style()
+        .foreground(!dealing && game.activeColor ? CARD_COLORS[game.activeColor] : WHITE)
+        .render(colorLabel),
+      9
+    )
+  )
+  const inner = style.joinHorizontal(style.position.top, mazo, '   ', descarte, '   ', color)
+  const innerRows = inner.split('\n')
+  const status = dealing ? dealLine(game, view) : stackLine(game)
+
+  // Lay the content into the middle rows of the ellipse, the status line just
+  // under it, and fill the rest with felt.
+  const contentTop = Math.floor((TABLE_ROWS - innerRows.length - 2) / 2)
+  const rows = []
+  for (let r = 0; r < TABLE_ROWS; r++) {
+    const hw = tableRowHalfWidth(r)
+    const edgeL = r === 0 ? '╭' : r === TABLE_ROWS - 1 ? '╰' : '('
+    const edgeR = r === 0 ? '╮' : r === TABLE_ROWS - 1 ? '╯' : ')'
+    const span = hw * 2 - 2
+    let body
+    const ci = r - contentTop
+    if (ci >= 0 && ci < innerRows.length) body = pad(innerRows[ci], span)
+    else if (ci === innerRows.length + 1) body = pad(status, span)
+    else if (r === 0 || r === TABLE_ROWS - 1) body = '─'.repeat(span)
+    else body = ' '.repeat(span)
+    const side = ' '.repeat(TABLE_HALF_W - hw)
+    rows.push(
+      side +
+        style().foreground(MID).render(edgeL) +
+        body +
+        style().foreground(MID).render(edgeR) +
+        side
+    )
   }
-
-  // While dealing, the pile is visibly still giving cards away.
-  const left =
-    view.dealt === undefined
-      ? game.draw.length
-      : game.draw.length + (game.playerCount * 5 - view.dealt)
-  const mazo = column(`MAZO ${left}`, cards.smallBack())
-  const descarte = column(
-    'DESCARTE',
-    view.dealt === undefined ? cards.small(game.top) : cards.smallEmpty()
-  )
-  const color = column(
-    'COLOR',
-    view.dealt === undefined
-      ? stack(
-          cards.colorChip(game.activeColor),
-          style()
-            .foreground(game.activeColor ? CARD_COLORS[game.activeColor] : WHITE)
-            .render(game.activeColor || '—')
-        )
-      : cards.colorChip(null)
-  )
-
-  const middle = style.joinHorizontal(style.position.top, mazo, descarte, color)
-
-  const top = ['╭' + '─'.repeat(inner) + '╮']
-  for (const line of middle.split('\n')) top.push(pad(line, inner))
-  top.push(pad(view.dealt === undefined ? stackLine(game) : dealLine(game, view), inner))
-  top.push('╰' + '─'.repeat(inner) + '╯')
-
-  return tableSprite(top.join('\n'))
+  return tableSprite(rows.join('\n'), width)
 }
 
 // Dress the table top as a piece of furniture. The top is drawn by the caller
@@ -195,14 +224,8 @@ function feltBlock(game, view) {
 //      ║            ║
 //    ▁▁╨▁▁▁▁▁▁▁▁▁▁▁▁╨▁▁    <- feet on the floor, and the floor itself
 //      ░░░░░░░░░░░░░░      <- shadow under the table
-function tableSprite(top) {
+function tableSprite(top, width) {
   const lines = top.split('\n')
-  const width = style.width(lines[0])
-
-  // The rim sits one cell in from each edge, like a bevel seen from above.
-  const rim = style()
-    .foreground(WOOD_DARK)
-    .render(' ' + '▀'.repeat(width - 2) + ' ')
 
   // Legs a fifth of the way in from each side, bold so they read as solid.
   const legAt = Math.max(2, Math.floor(width / 5))
@@ -228,7 +251,7 @@ function tableSprite(top) {
   const shadow =
     ' '.repeat(3) + style().foreground(SHADOW).render('░'.repeat(shadowW)) + ' '.repeat(3)
 
-  return [...lines, rim, legRow(), legRow(), floor, shadow].join('\n')
+  return [...lines, legRow(), legRow(), floor, shadow].join('\n')
 }
 
 // The bottom line of the felt during the deal: a card sliding from the pile
@@ -291,7 +314,6 @@ function partidaLines(game) {
   const actor = game.currentActor()
   const rows = [
     ['Turno', actor === null ? '—' : game.players[actor].name],
-    ['Ronda', `${game.roundNumber} · a ${game.target}`],
     ['Tu mano', `${game.hands[0].length} cartas`]
   ]
 
@@ -409,17 +431,18 @@ function renderHeader(game, view, width) {
 
 // Everyone's score on one line — there are no teams in UNO.
 function renderScore(game, width) {
-  const best = Math.max(...game.scores)
+  const fewest = Math.min(...game.hands.map((h) => h.length))
   const parts = game.players.map((p, seat) => {
-    const tone = seat === 0 ? SKY : game.scores[seat] === best && best > 0 ? LIGHT : WHITE
+    const n = game.hands[seat].length
+    const tone = seat === 0 ? SKY : n === fewest ? LIGHT : WHITE
     return (
       style().foreground(tone).render(`${p.name} `) +
-      style().bold(true).foreground(tone).render(String(game.scores[seat]))
+      style().bold(true).foreground(tone).render(String(n))
     )
   })
 
   const left = ' ' + parts.join(style().faint(true).render('  ·  '))
-  const right = style().faint(true).render(`ronda ${game.roundNumber} · a ${game.target} `)
+  const right = style().faint(true).render('cartas en mano ')
   const room = width - style.width(left) - style.width(right)
   return left + ' '.repeat(Math.max(1, room)) + right
 }
@@ -549,17 +572,21 @@ function renderPrompt(game, view) {
 
 // --- the whole frame -----------------------------------------------------
 
-const TOP = { partida: 34, chat: 84, rows: 7 }
-
 function renderGame(game, view) {
   const width = CANVAS.width
 
-  const top = style.joinHorizontal(
-    style.position.top,
-    panel('PARTIDA', partidaLines(game), TOP.partida, TOP.rows),
-    ' '.repeat(COLUMNS.gutter),
-    panel('CHAT / LOG', chatLines(game, TOP.chat - 2, TOP.rows - 3), TOP.chat, TOP.rows)
-  )
+  // One line of state: whose turn, and the last thing that happened at the
+  // table. The panels this replaced spent seven rows on the same thing.
+  const actor = game.currentActor()
+  const turno =
+    style().faint(true).render('turno ') +
+    style()
+      .bold(true)
+      .foreground(SKY)
+      .render(actor === null ? '—' : game.players[actor].name)
+  const last = game.events[game.events.length - 1]
+  const ultimo = last ? style().foreground(WHITE).render(style.truncate(last.text, 70)) : ''
+  const top = turno + '   ' + style().faint(true).render('·') + '   ' + ultimo
 
   const body = stack(
     renderHeader(game, view, width),
