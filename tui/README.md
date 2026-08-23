@@ -1,6 +1,6 @@
 # 🍐 The Great Pear
 
-> UNO for the terminal, played with pears — running on [Bare](https://github.com/holepunchto/bare), delivered and updated **peer-to-peer** with [Pear](https://docs.pears.com/).
+> UNO for the terminal — running on [Bare](https://github.com/holepunchto/bare), delivered and updated **peer-to-peer** with [Pear](https://docs.pears.com/).
 
 No app store, no CDN, no server. You install it from a `pear://` link, and when a new
 version is staged it arrives over the swarm from whoever is seeding it.
@@ -46,8 +46,7 @@ UNO for the terminal, played against three AI rivals, with a deck trimmed to
 first to 500 points takes it.
 
 - **88 cards**: 0-9 in four colours (one 0, two of each 1-9), two +2 per
-  colour, four +4. A number card shows its value as **pears** laid out like the
-  pips on a playing card — you read it by counting, not by reading a digit.
+  colour, four +4.
 - **Matching** by colour or by number. A +4 is always playable and its player
   names the colour that continues.
 - **Stacking**: a +2 is answered with another +2 and a +4 with another +4 — the
@@ -172,7 +171,7 @@ status line in the top-right corner.
 ### Tests
 
 ```
-npm test    # 130 tests, 680 assertions
+npm test    # 130 tests, 675 assertions
 ```
 
 Beyond the rule-by-rule unit tests, two of them carry most of the weight:

@@ -406,12 +406,11 @@ test('cards: every card is exactly the same rectangle', (t) => {
   }
 })
 
-test('cards: the pips count the value', (t) => {
-  const { PEAR } = cardsUi
-  for (let rank = 0; rank <= 9; rank++) {
+test('cards: the rank is printed, in the corners and the middle', (t) => {
+  for (const rank of [0, 7, 9, '+2', '+4']) {
     const drawn = stripAnsi(cardsUi.big(card('rojo', rank)))
-    const pears = [...drawn].filter((ch) => ch === PEAR).length
-    t.is(pears, rank, `a ${rank} shows ${rank} pears`)
+    const pattern = new RegExp(String(rank).replace('+', '\\+'), 'g')
+    t.is((drawn.match(pattern) || []).length, 3, `a ${rank} shows its rank three times`)
   }
 })
 

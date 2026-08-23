@@ -199,11 +199,11 @@ function chatLines(game, width, height) {
 // Your hand, the selected card lifted, numbered like the keys that play it.
 // A hand grows well past the five it was dealt when stacks land on you, so it
 // is capped at what the canvas holds and the overflow is counted, not drawn.
-// Pear cards are 12 columns wide, so eight of them plus their gaps is what the
-// canvas holds. A hand grows well past that when stacks land on you, so the
+// Cards are 7 columns wide, so thirteen of them plus their gaps is what the
+// canvas holds. A hand still grows past that when stacks land on you, so the
 // window scrolls to follow the selection — every card stays reachable with the
 // arrows even when it is not on screen.
-const HAND_SLOTS = 8
+const HAND_SLOTS = 13
 
 function handWindow(total, selected) {
   if (total <= HAND_SLOTS) return 0
