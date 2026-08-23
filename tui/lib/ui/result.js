@@ -6,7 +6,11 @@
 // the canvas size.
 const { style } = require('../tea')
 const { CANVAS, pad, fit } = require('./canvas')
-const { MID, WHITE } = require('./palette')
+const { WHITE } = require('./palette')
+
+// One tone per row of the 5-row headline.
+const WIN_RAMP = [226, 190, 154, 118, 82]
+const LOSE_RAMP = [214, 208, 202, 196, 160]
 
 const BUTTONS = [
   { id: 'menu', label: 'BACK TO MENU' },
@@ -46,7 +50,7 @@ function button(label, focus, inner) {
   const core = focus ? `▸ ${spaced} ◂` : spaced
   const left = Math.floor((inner - core.length) / 2)
   const line = ' '.repeat(left) + core + ' '.repeat(inner - core.length - left)
-  const tone = focus ? 226 : 244
+  const tone = focus ? WHITE : 244
   return [
     '╔' + '═'.repeat(inner) + '╗',
     '║' + ' '.repeat(inner) + '║',
@@ -68,10 +72,11 @@ function renderResult(game, view) {
   const won = game.winner() === (view.me ?? 0)
   const winner = game.players[game.winner()]
 
-  // Victory glows yellow-green like the pear; defeat sits in the blue chrome.
-  const tone = won ? 226 : MID
+  // The headline carries all the colour: a row-by-row ramp, yellow down to
+  // green for a win, orange down to red for a loss. Everything else is white.
+  const ramp = won ? WIN_RAMP : LOSE_RAMP
   const headline = bigText(won ? 'YOU WIN' : 'YOU LOSE')
-    .map((r) => style().bold(true).foreground(tone).render(r))
+    .map((r, i) => style().bold(true).foreground(ramp[i]).render(r))
     .join('\n')
 
   const verdict = won
@@ -82,8 +87,7 @@ function renderResult(game, view) {
   const left = game.players
     .map((p, seat) => {
       const n = game.hands[seat].length
-      const t = seat === game.winner() ? tone : WHITE
-      return style().foreground(t).render(`${p.name} ${n}`)
+      return style().foreground(WHITE).render(`${p.name} ${n}`)
     })
     .join(style().faint(true).render('  ·  '))
 
