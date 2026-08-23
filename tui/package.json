@@ -1,0 +1,52 @@
+{
+  "name": "the-great-pear",
+  "productName": "the-great-pear",
+  "version": "2.0.11",
+  "description": "The Great Pear — a terminal UNO game on Bare, delivered and updated peer-to-peer with Pear.",
+  "private": true,
+  "bin": "bin.js",
+  "upgrade": "pear://u9y7y9xqggifyeihhi9i1cswyqdrtdjbg75y6obxxy6hwe6uu66o",
+  "scripts": {
+    "format": "prettier . --write",
+    "test": "PATH=\"$PWD/node_modules/bare-runtime/bin:$PATH\" brittle-bare test/index.js",
+    "lint": "prettier . --check && lunte",
+    "start": "node node_modules/bare-runtime/bin/bare bin.js --no-updates",
+    "make": "node scripts/make.js",
+    "deploy": "node scripts/deploy.js",
+    "make:darwin-arm64": "bare-build --name the-great-pear --standalone --host darwin-arm64 --out ./out/darwin-arm64 bin.js",
+    "make:darwin-x64": "bare-build --name the-great-pear --standalone --host darwin-x64 --out ./out/darwin-x64 bin.js",
+    "make:linux-arm64": "bare-build --name the-great-pear --standalone --host linux-arm64 --out ./out/linux-arm64 bin.js",
+    "make:linux-x64": "bare-build --name the-great-pear --standalone --host linux-x64 --out ./out/linux-x64 bin.js",
+    "make:win32-arm64": "bare-build --name the-great-pear --standalone --host win32-arm64 --out ./out/win32-arm64 bin.js",
+    "make:win32-x64": "bare-build --name the-great-pear --standalone --host win32-x64 --out ./out/win32-x64 bin.js",
+    "start:updates": "node node_modules/bare-runtime/bin/bare bin.js --updates",
+    "net:test": "node scripts/net-test.js",
+    "lockstep:test": "node scripts/lockstep-test.js"
+  },
+  "dependencies": {
+    "b4a": "^1.8.1",
+    "bare-fs": "^4.5.1",
+    "bare-os": "^3.9.0",
+    "bare-path": "^3.0.0",
+    "bare-storage": "^1.1.0",
+    "corestore": "^7.9.2",
+    "framed-stream": "^1.0.1",
+    "hypercore-crypto": "^3.7.0",
+    "hyperswarm": "^4.17.0",
+    "paparam": "^1.10.1",
+    "pear-runtime": "1.1.1",
+    "which-runtime": "^1.4.0"
+  },
+  "overrides": {
+    "bare-sidecar": "0.4.6"
+  },
+  "devDependencies": {
+    "bare-build": "^0.5.3",
+    "bare-runtime": "^1.29.4",
+    "brittle": "^3.19.0",
+    "lunte": "^1.2.0",
+    "prettier": "^3.6.2",
+    "prettier-config-holepunch": "^2.0.0"
+  },
+  "license": "Apache-2.0"
+}
