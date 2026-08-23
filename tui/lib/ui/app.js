@@ -11,6 +11,7 @@ const ai = require('../uno/ai')
 const { renderGame } = require('./screen')
 const { renderMenu, renderRules, MENU_ITEMS } = require('./menu')
 const { renderResult, BUTTONS } = require('./result')
+const { renderBoot, BOOT_FRAMES } = require('./boot')
 const { fit, centre, tooSmall, tooSmallFor } = require('./canvas')
 
 // How long the rivals "think", in ms.
@@ -56,6 +57,8 @@ class App {
 
     this.game = null
     this.frame = 0
+    // Advances while the boot splash plays; the splash is a function of it.
+    this.bootFrame = 0
     // While a deal is in progress: how many cards have landed, and how many
     // frames the current one has been in the air. null between deals.
     this.dealing = null
@@ -69,6 +72,13 @@ class App {
   }
 
   init() {
+    // The splash only plays on a clean launch into the menu. If --jugar dealt a
+    // hand in the constructor, or the tests never call init(), we skip it and
+    // the model behaves exactly as before.
+    if (this.screen === 'menu' && this.think.frame !== 0) {
+      this.screen = 'boot'
+      this.bootFrame = 0
+    }
     return this._animate()
   }
 
@@ -78,6 +88,7 @@ class App {
   // for a still picture.
   _animating() {
     if (this.think.frame === 0) return false
+    if (this.screen === 'boot') return true
     if (this.screen === 'menu' || this.screen === 'result') return true
     if (this.screen !== 'game' || !this.game) return false
     return this.dealing !== null || this.game.currentActor() !== this.me
@@ -195,6 +206,15 @@ class App {
 
       case 'frame': {
         if (!this._animating()) return [this, null]
+
+        // The splash runs on its own counter; when it lands, the menu takes
+        // over and its animation loop continues without a beat missed.
+        if (this.screen === 'boot') {
+          this.bootFrame++
+          if (this.bootFrame >= BOOT_FRAMES) this.screen = 'menu'
+          return [this, this._animate()]
+        }
+
         this.frame++
         if (this.dealing !== null && this._advanceDeal()) {
           // Last card down: the deal is over and play can begin.
@@ -326,6 +346,12 @@ class App {
 
   _onKey(msg) {
     if (key.matches(msg, 'ctrl+c')) return [this, quit]
+
+    // Any key skips the splash straight to the menu.
+    if (this.screen === 'boot') {
+      this.screen = 'menu'
+      return [this, this._animate()]
+    }
 
     if (this.screen === 'menu') return this._menuKey(msg)
     if (this.screen === 'result') return this._resultKey(msg)
@@ -585,7 +611,9 @@ class App {
     }
 
     const canvas =
-      this.screen === 'menu'
+      this.screen === 'boot'
+        ? renderBoot({ frame: this.bootFrame, version: this.version })
+        : this.screen === 'menu'
         ? renderMenu({
             ...shared,
             index: this.menuIndex,

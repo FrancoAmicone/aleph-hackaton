@@ -804,6 +804,9 @@ test('program: draws the menu and quits cleanly on ctrl+c', async (t) => {
   const done = program.run()
   await new Promise((resolve) => setTimeout(resolve, 15))
 
+  input.write(' ') // skip the boot splash through to the menu
+  await new Promise((resolve) => setTimeout(resolve, 15))
+
   input.write('\x03') // ctrl+c
   await done
 
