@@ -2,7 +2,6 @@
 const { style } = require('../tea')
 const { CANVAS, pad, fit } = require('./canvas')
 const { SKY, MID, WHITE } = require('./palette')
-const { bars, SPEED } = require('./bars')
 const { frame } = require('./pear')
 
 // The two buttons, in the order they sit on screen.
@@ -94,9 +93,6 @@ function button(label, focus, inner) {
   )
 }
 
-// Rows of glitch bars above the title. Fixed, like everything else.
-const BAND_ROWS = 2
-
 // The pear: this wide, this tall. Sized so the title, the pear and the buttons
 // all fit the 38-row canvas with room to breathe.
 const PEAR_W = 34
@@ -107,8 +103,6 @@ const SPIN_PER_FRAME = 0.045
 
 function renderMenu(view) {
   const width = CANVAS.width
-  const t = (view.frame || 0) * SPEED
-
   const title = titleBlock()
   const tagline = style().foreground(108).render('· uno · delivered p2p over pear ·')
   const pear = frame((view.frame || 0) * SPIN_PER_FRAME, PEAR_W, PEAR_H)
@@ -132,7 +126,7 @@ function renderMenu(view) {
 
   return fit(
     [
-      ...bars(width, BAND_ROWS, t),
+      '',
       pad(title, width),
       pad(tagline, width),
       pad(pear, width),
@@ -188,4 +182,4 @@ function renderRules() {
   return ['', pad(title, width), '', pad(box, width), '', pad(footer, width)].join('\n')
 }
 
-module.exports = { renderMenu, renderRules, MENU_ITEMS, titleBlock, archText, BAND_ROWS }
+module.exports = { renderMenu, renderRules, MENU_ITEMS, titleBlock, archText }
