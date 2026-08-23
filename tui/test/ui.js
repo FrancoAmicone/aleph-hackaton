@@ -283,6 +283,23 @@ test('panel: draws an exact rectangle whatever is inside it', (t) => {
   }
 })
 
+test('prompt: el cartel de fin de partida mira MI asiento', (t) => {
+  // Mismo bug que en result.js, reintroducido en screen.js. El invitado que
+  // ganaba leía el nombre del otro en vez de "YOU WON".
+  const roster = [
+    { name: 'franco', isAI: false, level: 'normal' },
+    { name: 'gino', isAI: false, level: 'normal' }
+  ]
+  const game = new Game({ players: roster, rng: seeded(5) })
+  game.phase = 'game-over'
+  game.lastRound = { winner: 1, points: 12 }
+
+  const desde = (me) => stripAnsi(renderPrompt(game, { ...view, me }))
+
+  t.ok(desde(1).includes('YOU WON'), 'el ganador lee YOU WON')
+  t.ok(desde(0).includes('gino won'), 'el otro lee quién ganó')
+})
+
 test('resultado: gana el que gana, no siempre el asiento 0', (t) => {
   const roster = [
     { name: 'franco', isAI: false, level: 'normal' },

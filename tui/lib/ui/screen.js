@@ -625,7 +625,10 @@ function renderPrompt(game, view) {
   }
 
   if (game.phase === 'game-over') {
-    const won = game.winner() === 0
+    // Ganar es que gane MI asiento, no el 0. Con el 0 fijo, online el invitado
+    // que ganaba leía "franco won" en vez de "YOU WON". Es el mismo bug que ya
+    // se arregló en result.js:82; volvió en otro archivo.
+    const won = game.winner() === (view.me ?? 0)
     return style()
       .bold(true)
       .foreground(won ? SKY : MID)
