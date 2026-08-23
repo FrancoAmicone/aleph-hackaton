@@ -1,6 +1,6 @@
-# 🃏 Gran Truco Argentino
+# 🎴 El Gran UNO
 
-> Truco Argentino for the terminal — running on [Bare](https://github.com/holepunchto/bare), delivered and updated **peer-to-peer** with [Pear](https://docs.pears.com/).
+> UNO for the terminal — running on [Bare](https://github.com/holepunchto/bare), delivered and updated **peer-to-peer** with [Pear](https://docs.pears.com/).
 
 No app store, no CDN, no server. You install it from a `pear://` link, and when a new
 version is staged it arrives over the swarm from whoever is seeding it.
@@ -9,10 +9,10 @@ version is staged it arrives over the swarm from whoever is seeding it.
 pear install pear://izkyzf8cdezbqb6hxqxnmg8584y1c5o5aj5c47x5ui7fdo5zd5co
 ```
 
-On macOS that installs `truco.app`; run the game with:
+On macOS that installs `uno.app`; run the game with:
 
 ```sh
-truco.app/Contents/MacOS/truco
+uno.app/Contents/MacOS/uno
 ```
 
 <details>
@@ -29,8 +29,8 @@ pear install --timeout 300 pear://izkyzf8cdezbqb6hxqxnmg8584y1c5o5aj5c47x5ui7fdo
 You can also pull the raw binary instead of installing:
 
 ```sh
-pear dump pear://izkyzf8cdezbqb6hxqxnmg8584y1c5o5aj5c47x5ui7fdo5zd5co ./truco-dl
-./truco-dl/by-arch/darwin-arm64/app/truco        # or darwin-x64 / linux-x64
+pear dump pear://izkyzf8cdezbqb6hxqxnmg8584y1c5o5aj5c47x5ui7fdo5zd5co ./uno-dl
+./uno-dl/by-arch/darwin-arm64/app/uno        # or darwin-x64 / linux-x64
 ```
 
 </details>
@@ -41,50 +41,51 @@ pear dump pear://izkyzf8cdezbqb6hxqxnmg8584y1c5o5aj5c47x5ui7fdo5zd5co ./truco-dl
 
 ## What it is
 
-A full implementation of **Truco Argentino** — the real game, not a card-comparison toy:
+UNO for the terminal, played against three AI rivals, with a deck trimmed to
+**numbers, +2 and +4** — no Skip, no Reverse, no plain Wild. Five cards each,
+first to 500 points takes it.
 
-- **40-card Spanish deck** (1–7, 10, 11, 12 — no 8s, no 9s) with the true ranking,
-  from the ancho de espada down to the cuatros, including the _falsos_.
-- **Envido**, **Real Envido**, **Falta Envido**, with the proper accept/refuse
-  values and the falta scaled to what the leading team still needs.
-- **Truco → Retruco → Vale Cuatro**, where refusing pays the level below.
-- **Flor** and **Contraflor** (switchable off from the menu).
-- **"El envido está primero"** — answer a truco in the first trick with an
-  envido and it settles first, with the truco still on the table afterwards.
-- Correct **parda** resolution across all three tricks, including the
-  three-pardas-mano case.
-- **2 vs 2** with a partner and turn order around the table, or a **1 vs 1** duel.
-- Three levels of AI that bluff, fold, and know not to burn an ancho when their
-  partner already holds the trick.
+- **88 cards**: 0-9 in four colours (one 0, two of each 1-9), two +2 per
+  colour, four +4.
+- **Matching** by colour or by number. A +4 is always playable and its player
+  names the colour that continues.
+- **Stacking**: a +2 is answered with another +2 and a +4 with another +4 — the
+  count grows until somebody cannot answer and eats the lot.
+- **Draw and play**: with nothing playable you draw one, and if it fits you may
+  play it on the spot.
+- **¡UNO!**: down to one card you must call it. Anyone who catches you quiet
+  makes you draw two — and the rivals will, depending on how hard you set them.
+- **Scoring** the real way: the player who goes out banks what everyone else
+  still holds, numbers at face value, +2 worth 20 and +4 worth 50.
 
-Game to 30 points. Malas 0–14, buenas 15–29.
+Because play only ever moves one way round the table — there is no Reverse in
+this deck — the engine needs no direction state at all.
 
 ## Playing
 
-| Key         |                                     |
-| ----------- | ----------------------------------- |
-| `←` `→`     | pick a card                         |
-| `ENTER`     | play it                             |
-| `1` `2` `3` | play that card directly             |
-| `T`         | truco / retruco / vale cuatro       |
-| `E` `R` `A` | envido / real envido / falta envido |
-| `F` `C`     | flor / contraflor                   |
-| `Q` `N`     | quiero / no quiero                  |
-| `M`         | irse al mazo                        |
-| `ESC`       | back to the menu                    |
+| Key             |                                               |
+| --------------- | --------------------------------------------- |
+| `←` `→`         | pick a card                                   |
+| `ENTER`         | play it                                       |
+| `1`–`9`         | play that card directly                       |
+| `D`             | draw — or eat the stack when one is owed      |
+| `P`             | pass, after drawing an unplayable card        |
+| `U`             | shout ¡UNO! — or catch a rival who went quiet |
+| `R` `A` `V` `Z` | name the colour after a +4                    |
+| `ESC`           | back to the menu                              |
 
-The hint bar under the table is generated from the engine's own list of legal
-moves, so it can never offer you something the rules do not allow.
+The command line under your hand is generated from the engine's own list of
+legal moves, so it can never offer you something the rules do not allow.
 
 ### Flags
 
 ```sh
-truco --duelo              # 1 vs 1 instead of 2 vs 2
-truco --nivel duro         # facil | normal | duro
-truco --sin-flor           # play without flor
-truco --jugar              # skip the menu and deal
-truco --no-updates         # disable OTA updates for this run
-truco --storage <dir>      # use a specific storage directory
+uno --jugadores 3          # 2, 3 or 4 at the table
+uno --nivel duro           # facil | normal | duro
+uno --meta 200             # points to win: 200, 300 or 500
+uno --jugar                # skip the menu and deal
+uno --no-updates           # disable OTA updates for this run
+uno --storage <dir>        # use a specific storage directory
 ```
 
 ## Running from source
@@ -95,7 +96,7 @@ Requires [Node.js](https://nodejs.org/) (for npm and the build scripts) and
 ```sh
 npm install
 npm start          # dev mode — updates disabled so your build is not swapped mid-hand
-npm test           # 139 tests
+npm test           # 128 tests
 ```
 
 ## How it is built
@@ -105,7 +106,7 @@ branch **`tui`** — the variant that ships `lib/tea`, a Bubble Tea-style Elm
 Architecture runtime for Bare terminals, and `lib/pear-cli.js`, which wires up
 pear-runtime, the OTA updater, swarm replication and teardown.
 
-`lib/tea` is used untouched. Everything under `lib/truco` and `lib/ui` is this
+`lib/tea` is used untouched. Everything under `lib/uno` and `lib/ui` is this
 game. `lib/pear-cli.js` needed three changes, described [below](#changes-to-the-template).
 
 ```
@@ -113,9 +114,8 @@ bin.js                  entrypoint — wires pear-cli to the game model
 lib/
   pear-cli.js           template: runtime, updater, swarm, teardown
   tea/                  template: the TUI framework (untouched)
-  truco/
-    deck.js             Spanish deck + Truco ranking
-    envido.js           envido / flor arithmetic
+  uno/
+    deck.js             the 88-card deck and what matches what
     engine.js           the rules — a pure state machine
     ai.js               the rivals
   ui/
@@ -123,7 +123,7 @@ lib/
     palette.js          the colour ramp, as ANSI-256 indices
     cards.js            drawing cards
     bars.js             the animated glitch bars on the title screen
-    screen.js           the table dashboard: mesa, panels, chat
+    screen.js           the table: felt, panels, hand, command line
     menu.js             title screen and rules card
     app.js              the root model: menu → table → result
 scripts/
@@ -156,7 +156,7 @@ status line in the top-right corner.
 
 1. **Argument parsing was off by one in built binaries.** It sliced a fixed
    `Bare.argv.slice(2)`, which is right for `bare bin.js …` but wrong for a
-   standalone build invoked as `truco --duelo` — the first flag was silently
+   standalone build invoked as `uno --jugadores 3` — the first flag was silently
    swallowed, and `--storage <dir>` aborted with `UNKNOWN_ARG`. Now it slices
    based on whether it is running under `bare`.
 2. **A late swarm connection could kill the app.** The `connection` handler
@@ -164,22 +164,24 @@ status line in the top-right corner.
    began closing — during teardown, or when a second copy loses the race for the
    same storage directory — Corestore threw `Corestore is closed` as an uncaught
    rejection. Late connections are now dropped.
-3. **Platform-aware artifact naming**, so a copy installed as `truco.app` asks
+3. **Platform-aware artifact naming**, so a copy installed as `uno.app` asks
    the updater for the bundle and swaps the bundle directory, while a plain
    binary keeps updating as a plain binary.
 
 ### Tests
 
 ```
-npm test    # 139 tests, 577 assertions
+npm test    # 128 tests, 490 assertions
 ```
 
 Beyond the rule-by-rule unit tests, two of them carry most of the weight:
 
-- **Fuzz** — 400 complete games (four-handed and duels, all three AI levels) are
-  played to 30 points. Every action the AI picks is checked against the engine's
-  own legal-move list, and every game must terminate with a valid score. This is
-  what proves the canto state machine has no deadlock.
+- **Fuzz** — 200 complete games (all three AI levels) are played to 500 points.
+  Every action the AI picks is checked against the engine's own legal-move list,
+  every game must terminate with a valid score, and a separate run asserts the
+  88 cards are conserved across hands, draw pile and discard at every step —
+  which is what catches a card being lost in a reshuffle or duplicated by a
+  stack.
 - **Frame invariants** — frames are rendered at several terminal sizes and
   through a whole played-out hand, asserting no line is ever wider than the
   screen and no frame taller. An overflowing line tears the alt-screen, and you
@@ -187,11 +189,11 @@ Beyond the rule-by-rule unit tests, two of them carry most of the weight:
 
 ## Platforms
 
-| Target      | Ships                 | Status                  |
-| ----------- | --------------------- | ----------------------- |
-| macOS arm64 | `truco` + `truco.app` | built and run here      |
-| macOS x64   | `truco` + `truco.app` | cross-compiled, not run |
-| Linux x64   | `truco`               | cross-compiled, not run |
+| Target      | Ships             | Status                  |
+| ----------- | ----------------- | ----------------------- |
+| macOS arm64 | `uno` + `uno.app` | built and run here      |
+| macOS x64   | `uno` + `uno.app` | cross-compiled, not run |
+| Linux x64   | `uno`             | cross-compiled, not run |
 
 Windows is buildable (`npm run make:win32-x64`) but is not part of this release.
 
@@ -213,11 +215,11 @@ pear seed  pear://izkyzf8cdezbqb6hxqxnmg8584y1c5o5aj5c47x5ui7fdo5zd5co
 deploy/
   package.json                                # its `version` is what the updater compares
   by-arch/
-    darwin-arm64/app/truco                    # plain binary — what a dump/direct install runs
-    darwin-arm64/app/truco.app/               # bundle — the only shape `pear install` accepts
-        Contents/MacOS/truco
+    darwin-arm64/app/uno                      # plain binary — what a dump/direct install runs
+    darwin-arm64/app/uno.app/                 # bundle — the only shape `pear install` accepts
+        Contents/MacOS/uno
         Contents/Info.plist
-    linux-x64/app/truco
+    linux-x64/app/uno
 ```
 
 Both macOS artifacts ship side by side so either install style finds its own,
@@ -225,6 +227,10 @@ and a running copy asks the updater for whichever one it was started as.
 
 > `pear seed` must be running for anyone to install or update. It runs until you
 > stop it.
+
+> The binaries are named after `productName`, which changed from `truco` to
+> `uno` when the game did. Anything installed from an older stage looks for the
+> old name and will not find an update — re-stage before demoing.
 
 ### Shipping an update
 

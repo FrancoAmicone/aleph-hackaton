@@ -1,26 +1,28 @@
 // The title screen and the rules card.
 const { style } = require('../tea')
 const { CANVAS, pad, fit } = require('./canvas')
-const { SKY, MID, WHITE, NAVY } = require('./palette')
+const { SKY, MID, WHITE, NAVY, CARD_COLORS } = require('./palette')
 const { bars, SPEED } = require('./bars')
+const { COLORS } = require('../uno/deck')
 
 const MENU_ITEMS = [
   { id: 'jugar', label: 'Jugar' },
-  { id: 'modo', label: 'Modo' },
+  { id: 'jugadores', label: 'Jugadores' },
   { id: 'nivel', label: 'Rivales' },
-  { id: 'flor', label: 'Con flor' },
+  { id: 'meta', label: 'Partida' },
   { id: 'reglas', label: 'Reglas' },
   { id: 'salir', label: 'Salir' }
 ]
 
-// The headline: 96 columns, which is what sets the canvas width.
+// The headline: 80 columns, built from the same letterforms as before so the
+// wordmark still reads as the same family.
 const HEADLINE = [
-  '███████╗██╗░░░░░  ░██████╗░██████╗░░█████╗░███╗░░██╗  ████████╗██████╗░██╗░░░██╗░█████╗░░█████╗░',
-  '██╔════╝██║░░░░░  ██╔════╝░██╔══██╗██╔══██╗████╗░██║  ╚══██╔══╝██╔══██╗██║░░░██║██╔══██╗██╔══██╗',
-  '█████╗░░██║░░░░░  ██║░░██╗░██████╔╝███████║██╔██╗██║  ░░░██║░░░██████╔╝██║░░░██║██║░░╚═╝██║░░██║',
-  '██╔══╝░░██║░░░░░  ██║░░╚██╗██╔══██╗██╔══██║██║╚████║  ░░░██║░░░██╔══██╗██║░░░██║██║░░██╗██║░░██║',
-  '███████╗███████╗  ╚██████╔╝██║░░██║██║░░██║██║░╚███║  ░░░██║░░░██║░░██║╚██████╔╝╚█████╔╝╚█████╔╝',
-  '╚══════╝╚══════╝  ░╚═════╝░╚═╝░░╚═╝╚═╝░░╚═╝╚═╝░░╚══╝  ░░░╚═╝░░░╚═╝░░╚═╝░╚═════╝░░╚════╝░░╚════╝░'
+  '███████╗██╗░░░░░  ░██████╗░██████╗░░█████╗░███╗░░██╗  ██╗░░░██╗███╗░░██╗░█████╗░',
+  '██╔════╝██║░░░░░  ██╔════╝░██╔══██╗██╔══██╗████╗░██║  ██║░░░██║████╗░██║██╔══██╗',
+  '█████╗░░██║░░░░░  ██║░░██╗░██████╔╝███████║██╔██╗██║  ██║░░░██║██╔██╗██║██║░░██║',
+  '██╔══╝░░██║░░░░░  ██║░░╚██╗██╔══██╗██╔══██║██║╚████║  ██║░░░██║██║╚████║██║░░██║',
+  '███████╗███████╗  ╚██████╔╝██║░░██║██║░░██║██║░╚███║  ╚██████╔╝██║░╚███║╚█████╔╝',
+  '╚══════╝╚══════╝  ░╚═════╝░╚═╝░░╚═╝╚═╝░░╚═╝╚═╝░░╚══╝  ░╚═════╝░╚═╝░░╚══╝░╚════╝░'
 ]
 
 // Rows of glitch bars above and below the title. Fixed, like everything else.
@@ -66,12 +68,12 @@ const LEVEL_LABEL = { facil: 'fáciles', normal: 'normales', duro: 'duros' }
 
 function valueFor(item, settings) {
   switch (item.id) {
-    case 'modo':
-      return settings.duelo ? 'mano a mano (1 vs 1)' : 'de a cuatro (2 vs 2)'
+    case 'jugadores':
+      return `${settings.jugadores} en la mesa`
     case 'nivel':
       return LEVEL_LABEL[settings.nivel]
-    case 'flor':
-      return settings.conFlor ? 'sí' : 'no'
+    case 'meta':
+      return `a ${settings.meta} puntos`
     default:
       return null
   }
@@ -82,10 +84,12 @@ function renderMenu(view) {
   const title = titleBlock()
 
   // A sun between the suits, flanking the wordmark.
-  const suits = style().foreground(SKY).render('♠ ♥ ♦ ♣')
-  const sun = style().bold(true).foreground(SKY).render('☼')
-  const word = style().bold(true).foreground(WHITE).render('A R G E N T I N O')
-  const subtitle = `${suits}   ${sun}  ${word}  ${sun}   ${suits}`
+  // Four swatches instead of card suits — the colours are what UNO is about.
+  const chips = COLORS.map((c) => style().bold(true).foreground(CARD_COLORS[c]).render('██')).join(
+    ' '
+  )
+  const word = style().bold(true).foreground(WHITE).render('+2   ·   +4')
+  const subtitle = `${chips}    ${word}    ${chips}`
 
   // The marker on the selected row pulses, so the screen reads as live even
   // while nothing else is happening.
@@ -147,16 +151,16 @@ function renderMenu(view) {
 }
 
 const RULES = [
-  ['Objetivo', 'Llegar a 30 puntos. 0-14 son malas, 15-29 son buenas.'],
-  ['La baraja', '40 cartas españolas: 1 al 7, 10, 11 y 12. Sin ochos ni nueves.'],
-  ['Orden', '1♠ > 1♣ > 7♠ > 7♦ > 3 > 2 > 1 (falso) > 12 > 11 > 10 > 7 (falso) > 6 > 5 > 4'],
-  ['Bazas', 'Tres bazas por mano. Gana la mano quien gane dos.'],
-  ['Parda', 'Empate en una baza. Primera parda: decide la segunda. Todas pardas: gana el mano.'],
-  ['Envido', 'Dos cartas del mismo palo: suma + 20. Si no, la carta más alta. Figuras valen 0.'],
-  ['Cantos', 'Envido 2 · Real Envido 3 · Falta Envido: lo que le falta al puntero.'],
-  ['Truco', 'Truco 2 · Retruco 3 · Vale Cuatro 4. No querido paga el escalón anterior.'],
-  ['Flor', 'Tres cartas del mismo palo: 20 + sus valores. Tapa el envido y paga 3.'],
-  ['El envido primero', 'Si te cantan truco en la primera baza, podés contestar con envido.']
+  ['Objetivo', 'Quedarte sin cartas antes que los demás. La partida es a 500 puntos.'],
+  ['El mazo', '88 cartas: números 0-9 en cuatro colores, ocho +2 y cuatro +4.'],
+  ['Reparto', 'Cinco cartas a cada uno. Se da vuelta una para empezar el descarte.'],
+  ['Tu turno', 'Tirás una carta que coincida en color o en número con la de arriba.'],
+  ['Si no podés', 'Robás una del mazo. Si esa sirve, la podés tirar en el acto.'],
+  ['+2', 'El siguiente roba dos y pierde el turno — salvo que responda con otro +2.'],
+  ['+4', 'Se puede tirar siempre. Elegís el color y el siguiente roba cuatro.'],
+  ['Apilar', 'Un +2 se responde con +2 y un +4 con +4: la cuenta se suma y sigue.'],
+  ['¡UNO!', 'Al quedarte con una carta cantá UNO. Si te pescan callado, robás dos.'],
+  ['Puntos', 'El que sale suma lo que quedó en las manos ajenas: número, +2 vale 20, +4 vale 50.']
 ]
 
 function renderRules() {

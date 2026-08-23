@@ -21,7 +21,38 @@ const DEEP = 17 // #00005f — sampled #002266
 const INK = 234 // #1c1c1c — sampled #16171B
 const WHITE = 231 // #ffffff
 
+// The four card colours. UNO lives or dies on telling them apart, so these are
+// picked for separation on a dark terminal rather than fidelity to the print
+// colours: the official blue (#0072BC) maps to a 256-index that is both dim and
+// already in use by the chrome, so card blue and green are brightened.
+const ROJO = 196 // #ff0000
+const AMARILLO = 220 // #ffd700
+const VERDE = 41 // #00d75f
+const AZUL = 33 // #0087ff
+
+// A +4 belongs to no colour until it is played.
+const COMODIN = 231 // #ffffff
+
+const CARD_COLORS = { rojo: ROJO, amarillo: AMARILLO, verde: VERDE, azul: AZUL }
+
 // Light to dark, for gradients across a block of rows.
 const RAMP = [SKY, LIGHT, BLUE, MID, STRONG, NAVY]
 
-module.exports = { SKY, LIGHT, BLUE, MID, STRONG, NAVY, DEEP, INK, WHITE, RAMP }
+module.exports = {
+  SKY,
+  LIGHT,
+  BLUE,
+  MID,
+  STRONG,
+  NAVY,
+  DEEP,
+  INK,
+  WHITE,
+  RAMP,
+  ROJO,
+  AMARILLO,
+  VERDE,
+  AZUL,
+  COMODIN,
+  CARD_COLORS
+}

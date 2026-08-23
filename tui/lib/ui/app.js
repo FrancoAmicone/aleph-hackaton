@@ -5,8 +5,8 @@
 // { type: 'ai' } Msg, so input and OTA update messages stay responsive even
 // while the rivals are playing.
 const { quit, tick, key } = require('../tea')
-const { Game } = require('../truco/engine')
-const ai = require('../truco/ai')
+const { Game } = require('../uno/engine')
+const ai = require('../uno/ai')
 const { renderGame } = require('./screen')
 const { renderMenu, renderRules, MENU_ITEMS } = require('./menu')
 const { fit, centre, tooSmall, tooSmallFor } = require('./canvas')
@@ -34,9 +34,9 @@ class App {
 
     this.menuIndex = 0
     this.settings = {
-      duelo: !!this.flags.duelo,
+      jugadores: Number(this.flags.jugadores) || 4,
       nivel: this.flags.nivel || 'normal',
-      conFlor: !this.flags.sinFlor
+      meta: Number(this.flags.meta) || 500
     }
 
     this.game = null
@@ -72,19 +72,10 @@ class App {
 
   startGame() {
     const level = this.settings.nivel
-    const roster = this.settings.duelo
-      ? [
-          { name: 'Vos', isAI: false },
-          { name: 'Rita', isAI: true, level }
-        ]
-      : [
-          { name: 'Vos', isAI: false },
-          { name: 'Rita', isAI: true, level },
-          { name: 'Coco', isAI: true, level },
-          { name: 'Nacho', isAI: true, level }
-        ]
+    const names = ['Vos', 'Rita', 'Coco', 'Nacho'].slice(0, this.settings.jugadores)
+    const roster = names.map((name, i) => ({ name, isAI: i > 0, level }))
 
-    this.game = new Game({ players: roster, conFlor: this.settings.conFlor, rng: this.rng })
+    this.game = new Game({ players: roster, target: this.settings.meta, rng: this.rng })
     this.screen = 'game'
     this.selected = 0
     this.says = {}
@@ -95,12 +86,13 @@ class App {
   // Hand the turn to the AI if it is theirs, as a delayed Cmd.
   _maybeAI() {
     const game = this.game
-    if (!game || game.phase === 'hand-over' || game.phase === 'game-over') return null
+    if (!game || game.phase === 'round-over' || game.phase === 'game-over') return null
 
     const seat = game.currentActor()
     if (seat === null || seat === 0) return null
 
-    const delay = game.phase === 'response' ? this.think.canto : this.think.play
+    // A live UNO window gets a longer beat, so there is time to shout.
+    const delay = game.unoWindow ? this.think.canto : this.think.play
     return tick(delay, () => ({ type: 'ai' }))
   }
 
@@ -213,9 +205,9 @@ class App {
       switch (item.id) {
         case 'jugar':
           return [this, this.startGame()]
-        case 'modo':
+        case 'jugadores':
         case 'nivel':
-        case 'flor':
+        case 'meta':
           this._cycle(item.id, 1)
           return [this, null]
         case 'reglas':
@@ -230,8 +222,16 @@ class App {
   }
 
   _cycle(id, dir) {
-    if (id === 'modo') this.settings.duelo = !this.settings.duelo
-    if (id === 'flor') this.settings.conFlor = !this.settings.conFlor
+    if (id === 'jugadores') {
+      const counts = [2, 3, 4]
+      const i = counts.indexOf(this.settings.jugadores)
+      this.settings.jugadores = counts[(i + dir + counts.length) % counts.length]
+    }
+    if (id === 'meta') {
+      const metas = [200, 300, 500]
+      const i = metas.indexOf(this.settings.meta)
+      this.settings.meta = metas[(i + dir + metas.length) % metas.length]
+    }
     if (id === 'nivel') {
       const levels = ai.LEVELS
       const i = levels.indexOf(this.settings.nivel)
@@ -256,9 +256,9 @@ class App {
       return [this, null]
     }
 
-    if (game.phase === 'hand-over') {
+    if (game.phase === 'round-over') {
       if (key.matches(msg, 'enter', 'space')) {
-        game.nextHand()
+        game.nextRound()
         this.says = {}
         this.selected = 0
         this.message = null
@@ -267,71 +267,77 @@ class App {
       return [this, null]
     }
 
-    // Nothing to do while the rivals are thinking.
+    // Shouting UNO happens out of turn — to save yourself, or to catch a rival
+    // who went quiet on one card.
+    if (key.matches(msg, 'u') && game.unoWindow) {
+      return [this, this._act({ type: 'uno', seat: 0 }, game.legalActions(0))]
+    }
+
+    // Naming a colour after a +4.
+    if (game.phase === 'choose-color' && game.chooser === 0) {
+      const colors = { r: 'rojo', a: 'amarillo', v: 'verde', z: 'azul' }
+      for (const [chord, color] of Object.entries(colors)) {
+        if (key.matches(msg, chord)) {
+          return [this, this._act({ type: 'color', seat: 0, color }, game.legalActions(0))]
+        }
+      }
+      return [this, null]
+    }
+
     if (game.currentActor() !== 0) return [this, null]
 
     const legal = game.legalActions(0)
     this.message = null
+    const hand = game.hands[0]
 
-    // Card selection and play.
-    if (game.phase === 'play') {
-      const hand = game.hands[0]
-
-      if (key.matches(msg, 'left', 'h')) {
-        this.selected = (this.selected - 1 + hand.length) % hand.length
-        return [this, null]
-      }
-      if (key.matches(msg, 'right', 'l')) {
-        this.selected = (this.selected + 1) % hand.length
-        return [this, null]
-      }
-
-      for (let i = 0; i < hand.length; i++) {
-        if (key.matches(msg, String(i + 1))) return [this, this._play(hand[i])]
-      }
-
-      if (key.matches(msg, 'enter', 'space')) return [this, this._play(hand[this.selected])]
-      if (key.matches(msg, 'm')) return [this, this._act({ type: 'mazo', seat: 0 }, legal)]
+    if (key.matches(msg, 'left', 'h')) {
+      this.selected = (this.selected - 1 + hand.length) % hand.length
+      return [this, null]
+    }
+    if (key.matches(msg, 'right', 'l')) {
+      this.selected = (this.selected + 1) % hand.length
+      return [this, null]
     }
 
-    if (game.phase === 'response') {
-      if (key.matches(msg, 'q')) return [this, this._act({ type: 'quiero', seat: 0 }, legal)]
-      if (key.matches(msg, 'n')) return [this, this._act({ type: 'no-quiero', seat: 0 }, legal)]
+    for (let i = 0; i < Math.min(hand.length, 9); i++) {
+      if (key.matches(msg, String(i + 1))) return [this, this._play(hand[i])]
     }
 
-    // Cantos share one key table across both phases.
-    const canto = this._cantoFor(msg, legal)
-    if (canto) return [this, this._act({ type: 'canto', seat: 0, canto }, legal)]
+    if (key.matches(msg, 'enter', 'space')) return [this, this._play(hand[this.selected])]
+
+    // One key for both, since only ever one of them is legal at a time: with a
+    // stack on the table you eat it, otherwise you draw one.
+    if (key.matches(msg, 'd')) {
+      const take = legal.find((a) => a.type === 'take')
+      const draw = legal.find((a) => a.type === 'draw')
+      if (take || draw) return [this, this._act(take || draw, legal)]
+      this.message = 'No podés robar ahora.'
+      return [this, null]
+    }
+
+    if (key.matches(msg, 'p')) {
+      const pass = legal.find((a) => a.type === 'pass')
+      if (pass) return [this, this._act(pass, legal)]
+      this.message = 'Sólo podés pasar después de robar.'
+      return [this, null]
+    }
 
     return [this, null]
   }
 
-  _cantoFor(msg, legal) {
-    const available = legal.filter((a) => a.type === 'canto').map((a) => a.canto)
-
-    const chords = {
-      t: ['truco', 'retruco', 'vale-cuatro'],
-      e: ['envido'],
-      r: ['real-envido'],
-      a: ['falta-envido'],
-      f: ['flor'],
-      c: ['contraflor'],
-      v: ['contraflor-al-resto']
-    }
-
-    for (const [chord, cantos] of Object.entries(chords)) {
-      if (!key.matches(msg, chord)) continue
-      const found = cantos.find((c) => available.includes(c))
-      if (found) return found
-      this.message = `No podés cantar eso ahora.`
-      return null
-    }
-    return null
-  }
-
   _play(card) {
     if (!card) return null
-    return this._act({ type: 'play', seat: 0, card }, this.game.legalActions(0))
+    const action = { type: 'play', seat: 0, card }
+    const legal = this.game.legalActions(0)
+
+    const allowed = legal.some(
+      (a) => a.type === 'play' && a.card.color === card.color && a.card.rank === card.rank
+    )
+    if (!allowed) {
+      this.message = 'Esa carta no va acá.'
+      return null
+    }
+    return this._act(action, legal)
   }
 
   // Apply an action only if the engine actually offers it — the UI never
@@ -340,9 +346,9 @@ class App {
     const allowed = legal.some(
       (a) =>
         a.type === action.type &&
-        a.canto === action.canto &&
+        a.color === action.color &&
         (!a.card ||
-          (action.card && a.card.rank === action.card.rank && a.card.suit === action.card.suit))
+          (action.card && a.card.color === action.card.color && a.card.rank === action.card.rank))
     )
     if (!allowed) {
       this.message = 'Esa jugada no vale.'

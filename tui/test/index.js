@@ -16,10 +16,9 @@ require('./stopwatch')
 require('./timer')
 require('./filepicker')
 
-require('./truco-cards')
-require('./truco-engine')
-require('./truco-ai')
-require('./truco-ui')
+require('./uno-engine')
+require('./uno-ai')
+require('./ui')
 
 test('works', (t) => {
   t.pass()

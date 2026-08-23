@@ -1,27 +1,21 @@
-// Drawing Spanish cards in a terminal.
+// Drawing UNO cards in a terminal.
 //
 // Every helper returns a rectangular block of the advertised size so the blocks
 // drop straight into style.joinHorizontal/joinVertical without ragging. Only
 // width-1 glyphs are used — an emoji would measure 1 here and render 2 in most
 // terminals, which would shear the whole layout.
-const { glyph } = require('../truco/deck')
+//
+// The rank is what identifies a card; the colour is the ink it is drawn in,
+// exactly as on a real deck. A +4 belongs to no colour and is drawn white.
 const { style } = require('../tea')
-const { SKY, LIGHT, BLUE, MID } = require('./palette')
-
-// Espadas and bastos are the "black" suits of a Spanish deck; oro and copa the
-// coloured ones. Mapped to terminal colours that stay legible on either theme.
-// Four steps of the celeste ramp, one per suit. The glyphs (♠ ♣ ♦ ♥) are what
-// actually name the suit; the colour is reinforcement, so keeping all four in
-// the one palette costs nothing and keeps the table on-brand.
-const SUIT_COLOR = { espada: SKY, basto: LIGHT, oro: BLUE, copa: MID }
-
-// Card backs sit in the app palette; the suit colours above deliberately do
-// not, since they are what tells the four Spanish suits apart at a glance.
-// ANSI-256 index, for the same portability reason as lib/ui/screen.js.
-const BACK = 26
+const { CARD_COLORS, COMODIN, MID, STRONG } = require('./palette')
 
 const BIG = { width: 7, height: 5 }
 const SMALL = { width: 5, height: 3 }
+
+function toneOf(card) {
+  return card.color ? CARD_COLORS[card.color] : COMODIN
+}
 
 function tint(lines, color, bold) {
   const s = style().foreground(color)
@@ -29,74 +23,93 @@ function tint(lines, color, bold) {
   return lines.map((line) => s.render(line))
 }
 
+const label = (card) => String(card.rank)
+
 // A full-size card for the player's own hand.
 //
 //   ┌─────┐
 //   │7    │
-//   │  ♦  │
+//   │  7  │
 //   │    7│
 //   └─────┘
 function big(card, opts = {}) {
-  const rank = String(card.rank)
-  const suit = glyph(card.suit)
-  const lines = [
+  const rank = label(card)
+  const rows = [
     '┌─────┐',
     `│${rank.padEnd(5)}│`,
-    `│  ${suit}  │`,
+    `│${center(rank, 5)}│`,
     `│${rank.padStart(5)}│`,
     '└─────┘'
   ]
 
   if (opts.selected) {
-    // Lift the selected card out with a bold border in its own colour.
+    // Lift the selected card out with a heavy border in its own colour.
     return tint(
-      ['┏━━━━━┓', `┃${rank.padEnd(5)}┃`, `┃  ${suit}  ┃`, `┃${rank.padStart(5)}┃`, '┗━━━━━┛'],
-      SUIT_COLOR[card.suit],
+      [
+        '┏━━━━━┓',
+        `┃${rank.padEnd(5)}┃`,
+        `┃${center(rank, 5)}┃`,
+        `┃${rank.padStart(5)}┃`,
+        '┗━━━━━┛'
+      ],
+      toneOf(card),
       true
     ).join('\n')
   }
 
-  const faded = opts.dim ? style().faint(true) : null
-  const out = tint(lines, SUIT_COLOR[card.suit], false)
-  return (faded ? out.map((l) => faded.render(l)) : out).join('\n')
+  const out = tint(rows, opts.dim ? STRONG : toneOf(card), false)
+  return out.join('\n')
 }
 
-// A compact card for the cards already on the table.
+// A compact card, for the discard pile.
 //
 //   ┌───┐
-//   │12♣│
+//   │ 7 │
 //   └───┘
-function small(card) {
-  const label = `${card.rank}${glyph(card.suit)}`.padEnd(3)
-  return tint(['┌───┐', `│${label}│`, '└───┘'], SUIT_COLOR[card.suit], true).join('\n')
+function small(card, opts = {}) {
+  return tint(['┌───┐', `│${center(label(card), 3)}│`, '└───┘'], toneOf(card), !opts.dim).join('\n')
 }
 
-// A face-down card — what the rivals are holding.
+// A face-down card — the draw pile, and what the rivals are holding.
 function smallBack() {
-  return tint(['┌───┐', '│▚▚▚│', '└───┘'], BACK, false).join('\n')
+  return tint(['┌───┐', '│▚▚▚│', '└───┘'], MID, false).join('\n')
 }
 
 function bigBack() {
-  return tint(['┌─────┐', '│▚▚▚▚▚│', '│▚▚▚▚▚│', '│▚▚▚▚▚│', '└─────┘'], BACK, false).join('\n')
+  return tint(['┌─────┐', '│▚▚▚▚▚│', '│▚▚▚▚▚│', '│▚▚▚▚▚│', '└─────┘'], MID, false).join('\n')
 }
 
-// An empty table slot: nothing played there yet.
+// An empty slot: nothing there yet.
 function smallEmpty() {
   const faint = style().faint(true)
   return ['╌╌╌╌╌', '  ·  ', '╌╌╌╌╌'].map((l) => faint.render(l)).join('\n')
 }
 
-// A blank block of the same footprint, for seats that are out of the hand.
 function blank(width, height) {
   return Array.from({ length: height }, () => ' '.repeat(width)).join('\n')
 }
 
 // The face-down fan a rival still holds, as a single line: "▚ ▚ ▚".
+// Long hands are summarised rather than drawn out, so a player who ate a big
+// stack cannot widen the row.
 function backsInline(count) {
   if (count <= 0) return style().faint(true).render('—')
-  return style()
-    .foreground(BACK)
-    .render(Array.from({ length: count }, () => '▚').join(' '))
+  const ink = style().foreground(MID)
+  if (count <= 6) return ink.render(Array.from({ length: count }, () => '▚').join(' '))
+  return ink.render(`▚▚▚ ×${count}`)
+}
+
+// A swatch of the colour currently in play, which after a +4 is not the colour
+// of the card on the pile.
+function colorChip(color) {
+  if (!color) return style().faint(true).render('  ·  ')
+  return style().bold(true).foreground(CARD_COLORS[color]).render('███')
+}
+
+function center(text, width) {
+  const room = Math.max(0, width - text.length)
+  const left = Math.floor(room / 2)
+  return ' '.repeat(left) + text + ' '.repeat(room - left)
 }
 
 module.exports = {
@@ -107,7 +120,8 @@ module.exports = {
   smallEmpty,
   blank,
   backsInline,
+  colorChip,
+  toneOf,
   BIG,
-  SMALL,
-  SUIT_COLOR
+  SMALL
 }

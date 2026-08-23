@@ -1,42 +1,37 @@
-// The table screen: a three-column dashboard built around the mesa.
+// The table screen.
 //
-//   COMANDOS │     Coco      │  MAZO
-//   Nacho    │  ╭─────────╮  │  Rita
-//   PARTIDA  │  │  MESA   │  │  CHAT / LOG
-//            │  ╰─────────╯  │
-//            │     Vos       │
-//            │  TUS CARTAS   │
-//
-// The centre column is the widest and everything in it — the seats above and
-// below, the felt, and your hand — is drawn to the same width, so the column
-// reads as one piece. The seats to your left and right are panels in the side
-// columns, the way the reference frames them.
+//   PARTIDA │ CHAT / LOG          <- the little that is not on the felt
+//              Coco
+//   Nacho  ╭ mazo · descarte ╮  Rita
+//              Vos
+//           tus cartas
+//   [1-9] jugar · [D] robar · …   <- every command, one line
 //
 // Pure: every function takes the game plus a view-state bag and returns a
-// string, and the whole thing is drawn at the fixed canvas size. Nothing here
-// reads the terminal or reflows, which is what lets the tests assert on exact
-// frames.
+// string, drawn at the fixed canvas size. Nothing here reads the terminal or
+// reflows, which is what lets the tests assert on exact frames.
 const { style } = require('../tea')
 const cards = require('./cards')
-const { SKY, LIGHT, BLUE, MID, STRONG, WHITE } = require('./palette')
+const { SKY, LIGHT, BLUE, MID, STRONG, WHITE, CARD_COLORS } = require('./palette')
 const { CANVAS, COLUMNS, pad, fit } = require('./canvas')
-const { envidoPoints, hasFlor, florPoints } = require('../truco/envido')
 
 // Frames of the spinner shown while the rivals are thinking.
 const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 
-const MESA_WIDTH = COLUMNS.centre
+const FELT = 46
+const FLANK = 12
 
 function stack(...blocks) {
   return blocks.filter((b) => b !== null && b !== undefined).join('\n')
 }
 
-// A titled box of an exact size. The content is padded out so every panel is a
-// clean rectangle and the columns line up whatever is inside them.
+// A titled box of an exact size, so the columns line up whatever is inside.
 function panel(title, body, width, height, opts = {}) {
   const inner = width - 2
-  const tone = opts.tone || SKY
-  const heading = style().bold(true).foreground(tone).render(title)
+  const heading = style()
+    .bold(true)
+    .foreground(opts.tone || SKY)
+    .render(title)
 
   const lines = [pad(heading, inner), ...String(body).split('\n')]
     .slice(0, height - 2)
@@ -50,176 +45,237 @@ function panel(title, body, width, height, opts = {}) {
     .render(lines.join('\n'))
 }
 
-// --- seats --------------------------------------------------------------
+// --- seats ---------------------------------------------------------------
 
-function playedBy(game, seat) {
-  const play = game.tricks[game.trickIndex].find((p) => p.seat === seat)
-  return play ? play.card : null
-}
-
-function cardOrSlot(game, seat) {
-  const card = playedBy(game, seat)
-  return card ? cards.small(card) : cards.smallEmpty()
-}
-
-// --- the mesa -----------------------------------------------------------
-
-// The centre of the table: the three tricks, marked off as they are decided.
-function felt(game) {
-  const marks = [0, 1, 2].map((i) => {
-    const result = game.trickResults[i]
-    if (result === undefined) return i === game.trickIndex ? '◆' : '·'
-    if (result === null) return '='
-    return result === 0 ? '▲' : '▼'
-  })
-
-  const dots = marks
-    .map((mark, i) => {
-      const live = i === game.trickIndex && game.trickResults[i] === undefined
-      return style()
-        .foreground(live ? SKY : mark === '·' ? STRONG : LIGHT)
-        .render(mark)
-    })
-    .join(' ')
-
-  return style().faint(true).render('bazas ') + dots
-}
-
-// Each player gets a panel of their own, the way the reference frames them:
-// the seat's name as the title, the cards still in their hand below it, and
-// anything they just said. The cards they have *played* are on the table.
-// A seat as a single line: who they are, what they still hold, what they just
-// said. The panels these replaced spent eleven rows saying the same thing.
+// A seat as one line: who they are, how many cards they hold, what they said.
 function seatLine(game, seat, view) {
   const player = game.players[seat]
   const onTurn = game.currentActor() === seat
+  const count = game.hands[seat].length
 
   const name = onTurn
     ? style().bold(true).foreground(SKY).render(`▶ ${player.name}`)
     : style()
-        .foreground(player.team === 0 ? LIGHT : MID)
+        .foreground(count === 1 ? LIGHT : WHITE)
         .render(player.name)
 
-  const backs = cards.backsInline(game.hands[seat].length)
+  // One card left is the thing everyone at the table is watching for.
+  const alarm = count === 1 ? style().bold(true).foreground(SKY).render(' ¡UNO!') : ''
   const said = view.says && view.says[seat]
   const bubble = said ? '  ' + style().italic(true).foreground(SKY).render(`«${said}»`) : ''
 
-  return `${name} ${backs}${bubble}`
+  return `${name} ${cards.backsInline(count)}${alarm}${bubble}`
 }
 
-// The flanking seats stack their name over their cards, so the felt keeps its
-// full width. Truncated to the flank so a long canto cannot widen the row.
 function flankLine(game, seat, view, align) {
   const player = game.players[seat]
   const onTurn = game.currentActor() === seat
+  const count = game.hands[seat].length
 
   const name = onTurn
     ? style().bold(true).foreground(SKY).render(player.name)
     : style()
-        .foreground(player.team === 0 ? LIGHT : MID)
+        .foreground(count === 1 ? LIGHT : WHITE)
         .render(player.name)
 
+  const rows = [name, cards.backsInline(count)]
+  if (count === 1) rows.push(style().bold(true).foreground(SKY).render('¡UNO!'))
   const said = view.says && view.says[seat]
-  const rows = [name, cards.backsInline(game.hands[seat].length)]
   if (said) rows.push(style().italic(true).foreground(SKY).render(`«${said}»`))
 
   return rows.map((r) => pad(style.truncate(r, FLANK), FLANK, align)).join('\n')
 }
 
-const FLANK = 10
+// --- the felt ------------------------------------------------------------
 
-function feltBlock(game, seats) {
-  const inner = COLUMNS.centre - 2
-  const rows = []
+// The middle of the table: the draw pile, the discard pile, and the colour in
+// play — which after a +4 is not the colour of the card showing, so it gets a
+// swatch of its own rather than being left to inference.
+function feltBlock(game) {
+  const inner = FELT - 2
+  const W = 14
 
-  const laid = (seat) => (seat === null ? cards.smallEmpty() : cardOrSlot(game, seat)).split('\n')
-
-  for (const line of laid(seats.north)) rows.push(pad(line, inner))
-  rows.push(pad('', inner))
-
-  const west = seats.west === null ? ['', '', ''] : laid(seats.west)
-  const east = seats.east === null ? ['', '', ''] : laid(seats.east)
-  const centre = ['', felt(game), style().faint(true).foreground(BLUE).render('♠')]
-  const side = 5
-  const middle = inner - (side + 4) * 2
-
-  for (let i = 0; i < 3; i++) {
-    rows.push(
-      '    ' +
-        pad(west[i] || '', side, 'left') +
-        pad(centre[i], middle) +
-        pad(east[i] || '', side, 'right') +
-        '    '
-    )
+  // Three columns of exactly four rows, so they line up whatever is in them.
+  const column = (title, body) => {
+    const lines = [pad(style().faint(true).render(title), W)]
+    for (const line of String(body).split('\n')) lines.push(pad(line, W))
+    while (lines.length < 4) lines.push(' '.repeat(W))
+    return lines.slice(0, 4).join('\n')
   }
 
-  rows.push(pad('', inner))
-  for (const line of laid(seats.south)) rows.push(pad(line, inner))
-
-  return style().border(style.borders.rounded).borderForeground(BLUE).render(rows.join('\n'))
-}
-
-// Which seat sits where. A duel has nobody on the flanks.
-function seatsOf(game) {
-  return game.playerCount === 2
-    ? { north: 1, west: null, east: null, south: 0 }
-    : { north: 2, west: 3, east: 1, south: 0 }
-}
-
-// The table on its own — the seats around it are drawn as panels by renderGame.
-function renderMesa(game, view) {
-  const seats = seatsOf(game)
-  const duel = game.playerCount === 2
-
-  const table = duel
-    ? feltBlock(game, seats)
-    : style.joinHorizontal(
-        style.position.center,
-        flankLine(game, seats.west, view, 'right'),
-        ' ',
-        feltBlock(game, seats),
-        ' ',
-        flankLine(game, seats.east, view, 'left')
-      )
-
-  const w = CANVAS.width
-  return stack(
-    pad(seatLine(game, seats.north, view), w),
-    pad(table, w),
-    pad(seatLine(game, seats.south, view), w)
+  const mazo = column(`MAZO ${game.draw.length}`, cards.smallBack())
+  const descarte = column('DESCARTE', cards.small(game.top))
+  const color = column(
+    'COLOR',
+    stack(
+      cards.colorChip(game.activeColor),
+      style()
+        .foreground(game.activeColor ? CARD_COLORS[game.activeColor] : WHITE)
+        .render(game.activeColor || '—')
+    )
   )
+
+  const middle = style.joinHorizontal(style.position.top, mazo, descarte, color)
+
+  const rows = ['╭' + '─'.repeat(inner) + '╮']
+  for (const line of middle.split('\n')) rows.push(pad(line, inner))
+  rows.push(pad(stackLine(game), inner))
+  rows.push('╰' + '─'.repeat(inner) + '╯')
+  return rows.join('\n')
 }
 
-// --- panels -------------------------------------------------------------
-
-const CANTO_KEYS = {
-  truco: 'T',
-  retruco: 'T',
-  'vale-cuatro': 'T',
-  envido: 'E',
-  'real-envido': 'R',
-  'falta-envido': 'A',
-  flor: 'F',
-  contraflor: 'C',
-  'contraflor-al-resto': 'V'
+// A live +2/+4 stack is the most urgent thing on the table.
+function stackLine(game) {
+  if (!game.pending) return style().faint(true).render('sin deudas')
+  return style()
+    .bold(true)
+    .foreground(SKY)
+    .render(`▲ ${game.pending.count} cartas en juego (${game.pending.rank})`)
 }
 
-const CANTO_HINTS = {
-  truco: 'truco',
-  retruco: 'retruco',
-  'vale-cuatro': 'vale cuatro',
-  envido: 'envido',
-  'real-envido': 'real',
-  'falta-envido': 'falta',
-  flor: 'flor',
-  contraflor: 'contraflor',
-  'contraflor-al-resto': 'contraflor'
+function renderMesa(game, view) {
+  const w = CANVAS.width
+  const table = style.joinHorizontal(
+    style.position.center,
+    flankLine(game, 3, view, 'right'),
+    ' ',
+    feltBlock(game),
+    ' ',
+    flankLine(game, 1, view, 'left')
+  )
+
+  return stack(pad(seatLine(game, 2, view), w), pad(table, w), pad(seatLine(game, 0, view), w))
 }
 
-// What you can do right now, taken straight from the engine's legal actions so
-// the list can never drift out of step with the rules.
-// Everything you can do right now, as [key, label] pairs, taken straight from
-// the engine's legal actions so the list can never drift from the rules.
+// --- panels --------------------------------------------------------------
+
+// Only what the score line does not already carry.
+function partidaLines(game) {
+  const actor = game.currentActor()
+  const rows = [
+    ['Turno', actor === null ? '—' : game.players[actor].name],
+    ['Ronda', `${game.roundNumber} · a ${game.target}`],
+    ['Tu mano', `${game.hands[0].length} cartas`]
+  ]
+
+  return rows
+    .map(
+      ([term, value]) =>
+        style().foreground(WHITE).render(term.padEnd(9)) +
+        style().bold(true).foreground(SKY).render(value)
+    )
+    .join('\n')
+}
+
+// The running feed, tagged by who said it.
+function chatLines(game, width, height) {
+  const lines = []
+
+  for (const event of game.events.slice(-height * 2)) {
+    const who =
+      event.seat === null || event.seat === undefined ? 'MESA' : game.players[event.seat].name
+    const tone =
+      event.kind === 'score'
+        ? SKY
+        : event.kind === 'canto'
+          ? LIGHT
+          : event.kind === 'over'
+            ? SKY
+            : WHITE
+
+    const said = event.text.replace(new RegExp(`^${who}:?\\s*`), '')
+    const tag = style()
+      .foreground(event.kind === 'score' ? SKY : BLUE)
+      .render(`[${who.toUpperCase()}]`)
+    const room = Math.max(6, width - style.width(tag) - 1)
+    lines.push(`${tag} ${style().foreground(tone).render(style.truncate(said, room))}`)
+  }
+
+  const tail = lines.slice(-height)
+  while (tail.length < height) tail.push('')
+  return tail.join('\n')
+}
+
+// Your hand, the selected card lifted, numbered like the keys that play it.
+// A hand grows well past the five it was dealt when stacks land on you, so it
+// is capped at what the canvas holds and the overflow is counted, not drawn.
+const HAND_SLOTS = 13
+
+function handLines(game, view) {
+  const hand = game.hands[0]
+  const yours = game.currentActor() === 0 && game.phase === 'play'
+
+  if (hand.length === 0) return pad(style().faint(true).render('(sin cartas)'), CANVAS.width)
+
+  const shown = hand.slice(0, HAND_SLOTS)
+  const blocks = shown.map((card, i) =>
+    cards.big(card, { selected: yours && i === view.selected, dim: !yours })
+  )
+
+  const row = style.joinHorizontal(style.position.top, ...interleave(blocks, ' '))
+  const numbers = shown
+    .map((_, i) => {
+      const tone = yours && i === view.selected ? SKY : STRONG
+      return style()
+        .foreground(tone)
+        .render(pad(i < 9 ? `[${i + 1}]` : '·', 7))
+    })
+    .join(' ')
+
+  const extra =
+    hand.length > HAND_SLOTS
+      ? style()
+          .faint(true)
+          .render(`  +${hand.length - HAND_SLOTS}`)
+      : ''
+
+  return stack(pad(row, CANVAS.width), pad(numbers + extra, CANVAS.width))
+}
+
+function interleave(blocks, sep) {
+  const out = []
+  blocks.forEach((b, i) => {
+    if (i > 0) out.push(sep)
+    out.push(b)
+  })
+  return out
+}
+
+// --- chrome --------------------------------------------------------------
+
+function renderHeader(game, view, width) {
+  const title =
+    style().foreground(MID).render('▚▚  ') + style().bold(true).foreground(WHITE).render('U N O')
+
+  const status = view.updateStatus
+    ? style().foreground(view.updateStatus.color).render(view.updateStatus.text)
+    : style().faint(true).render(`v${view.version}`)
+
+  const room = width - style.width(title) - style.width(status)
+  return title + ' '.repeat(Math.max(1, room)) + status
+}
+
+// Everyone's score on one line — there are no teams in UNO.
+function renderScore(game, width) {
+  const best = Math.max(...game.scores)
+  const parts = game.players.map((p, seat) => {
+    const tone = seat === 0 ? SKY : game.scores[seat] === best && best > 0 ? LIGHT : WHITE
+    return (
+      style().foreground(tone).render(`${p.name} `) +
+      style().bold(true).foreground(tone).render(String(game.scores[seat]))
+    )
+  })
+
+  const left = ' ' + parts.join(style().faint(true).render('  ·  '))
+  const right = style().faint(true).render(`ronda ${game.roundNumber} · a ${game.target} `)
+  const room = width - style.width(left) - style.width(right)
+  return left + ' '.repeat(Math.max(1, room)) + right
+}
+
+// --- commands ------------------------------------------------------------
+
+// What you can do right now, as [key, label] pairs, taken straight from the
+// engine's legal actions so the list can never drift from the rules.
 function commands(game) {
   if (game.phase === 'game-over') {
     return [
@@ -227,7 +283,7 @@ function commands(game) {
       ['ESC', 'salir']
     ]
   }
-  if (game.phase === 'hand-over') {
+  if (game.phase === 'round-over') {
     return [
       ['ENTER', 'seguir'],
       ['ESC', 'menú']
@@ -237,30 +293,26 @@ function commands(game) {
   const actions = game.legalActions(0)
   if (actions.length === 0) return []
 
-  const rows =
-    game.phase === 'response'
-      ? [
-          ['Q', 'quiero'],
-          ['N', 'no quiero']
-        ]
-      : [
-          ['1-3', 'carta'],
-          ['←/→', 'elegir'],
-          ['ENTER', 'jugar']
-        ]
+  const has = (type) => actions.some((a) => a.type === type)
+  const rows = []
 
-  for (const action of actions) {
-    if (action.type === 'canto') rows.push([CANTO_KEYS[action.canto], CANTO_HINTS[action.canto]])
+  if (has('color')) {
+    rows.push(['R', 'rojo'], ['A', 'amarillo'], ['V', 'verde'], ['Z', 'azul'])
+  } else {
+    if (has('play')) rows.push(['1-9', 'jugar'], ['←/→', 'elegir'], ['ENTER', 'tirar'])
+    if (has('draw')) rows.push(['D', 'robar'])
+    if (has('take')) rows.push(['D', `comer ${game.pending.count}`])
+    if (has('pass')) rows.push(['P', 'pasar'])
   }
 
-  if (game.phase === 'play') rows.push(['M', 'mazo'])
+  if (has('uno')) rows.push(['U', game.unoWindow.seat === 0 ? '¡UNO!' : 'pescar'])
   rows.push(['ESC', 'menú'])
   return rows
 }
 
-// One line under the table. If the full set does not fit, the least useful
-// hints drop out rather than the line wrapping or being cut mid-word.
-const OPTIONAL = ['elegir', 'carta']
+// One line under the hand. If the full set does not fit, the softest hints go
+// before the ones that actually move the game on.
+const OPTIONAL = ['elegir', 'jugar']
 
 function commandLine(game, width) {
   let rows = commands(game)
@@ -287,148 +339,7 @@ function commandLine(game, width) {
   return '  ' + style.truncate(line, width - 2)
 }
 
-// Only what the header and the felt do not already say. Scores, the stake and
-// the hand number live in the score bar; repeating them here was noise.
-function partidaLines(game) {
-  const actor = game.currentActor()
-  const dealt = game.dealt[0]
-
-  const rows = [
-    ['Turno', actor === null ? '—' : game.players[actor].name],
-    ['Tu envido', String(envidoPoints(dealt))]
-  ]
-  if (hasFlor(dealt)) rows.push(['Tu flor', String(florPoints(dealt))])
-  rows.push(['Mano', `${game.handNumber} · a ${game.target}`])
-
-  return rows
-    .map(
-      ([term, value]) =>
-        style().foreground(WHITE).render(term.padEnd(11)) +
-        style().bold(true).foreground(SKY).render(value)
-    )
-    .join('\n')
-}
-
-function chatLines(game, width, height) {
-  const lines = []
-
-  for (const event of game.events.slice(-height * 2)) {
-    const who =
-      event.seat === null || event.seat === undefined ? 'MESA' : game.players[event.seat].name
-    const tone =
-      event.kind === 'score'
-        ? SKY
-        : event.kind === 'canto'
-          ? LIGHT
-          : event.kind === 'over'
-            ? SKY
-            : WHITE
-
-    // The tag already names the speaker, so drop the name the engine put at the
-    // front of the line — "[RITA] Rita: ¡Truco!" reads worse than "[RITA] ¡Truco!".
-    const said = event.text.replace(new RegExp(`^${who}:?\\s*`), '')
-
-    const tag = style()
-      .foreground(event.kind === 'score' ? SKY : BLUE)
-      .render(`[${who.toUpperCase()}]`)
-    const room = Math.max(6, width - style.width(tag) - 1)
-    lines.push(`${tag} ${style().foreground(tone).render(style.truncate(said, room))}`)
-  }
-
-  const tail = lines.slice(-height)
-  while (tail.length < height) tail.push('')
-  return tail.join('\n')
-}
-
-// Your three cards, the selected one lifted, numbered like the keys that play
-// them.
-function handLines(game, view) {
-  const hand = game.hands[0]
-  const inner = COLUMNS.centre - 2
-  const yourTurn = game.currentActor() === 0 && game.phase === 'play'
-
-  if (hand.length === 0) return pad(style().faint(true).render('(sin cartas)'), inner)
-
-  const blocks = hand.map((card, i) =>
-    cards.big(card, { selected: yourTurn && i === view.selected, dim: !yourTurn })
-  )
-
-  const row = style.joinHorizontal(style.position.top, ...interleave(blocks, ' '))
-  const numbers = hand
-    .map((_, i) => {
-      const tone = yourTurn && i === view.selected ? SKY : STRONG
-      return style()
-        .foreground(tone)
-        .render(` [${i + 1}]  `)
-    })
-    .join(' ')
-
-  return stack(pad(row, inner), pad(numbers, inner))
-}
-
-function interleave(blocks, sep) {
-  const out = []
-  blocks.forEach((b, i) => {
-    if (i > 0) out.push(sep)
-    out.push(b)
-  })
-  return out
-}
-
-// --- chrome -------------------------------------------------------------
-
-function renderHeader(game, view, width) {
-  const title =
-    style().foreground(MID).render('♠ ♥ ♦ ♣  ') +
-    style().bold(true).foreground(WHITE).render('EL GRAN TRUCO')
-
-  const status = view.updateStatus
-    ? style().foreground(view.updateStatus.color).render(view.updateStatus.text)
-    : style().faint(true).render(`v${view.version}`)
-
-  const room = width - style.width(title) - style.width(status)
-  return title + ' '.repeat(Math.max(1, room)) + status
-}
-
-function scoreBar(points, target, color) {
-  const cells = 12
-  const filled = Math.round((points / target) * cells)
-  return (
-    style().foreground(color).render('█'.repeat(filled)) +
-    style()
-      .faint(true)
-      .render('░'.repeat(cells - filled))
-  )
-}
-
-function renderScore(game, width) {
-  const [us, them] = game.scores
-
-  // The two teams are separated by brightness inside the one palette — which
-  // also reads better than green/red for anyone colourblind.
-  const left =
-    style()
-      .bold(true)
-      .foreground(SKY)
-      .render(` NOSOTROS ${String(us).padStart(2)} `) + scoreBar(us, game.target, SKY)
-
-  const right =
-    scoreBar(them, game.target, MID) +
-    style()
-      .bold(true)
-      .foreground(MID)
-      .render(` ELLOS ${String(them).padStart(2)} `)
-
-  const middle = style()
-    .faint(true)
-    .render(`mano ${game.handNumber} · en juego ${game.handValue()} · a ${game.target}`)
-
-  const room = width - style.width(left) - style.width(right) - style.width(middle) - 2
-  const half = Math.floor(room / 2)
-  return left + ' '.repeat(half + 1) + middle + ' '.repeat(room - half + 1) + right
-}
-
-// The one line under the dashboard: what the game is waiting for.
+// The line that says what the game is waiting for.
 function renderPrompt(game, view) {
   if (game.phase === 'game-over') {
     const won = game.winner() === 0
@@ -438,16 +349,19 @@ function renderPrompt(game, view) {
       .render(
         won
           ? '  ¡GANASTE LA PARTIDA!  ENTER para volver al menú'
-          : '  Perdiste la partida.  ENTER para volver al menú'
+          : `  Ganó ${game.players[game.winner()].name}.  ENTER para volver al menú`
       )
   }
 
-  if (game.phase === 'hand-over') {
-    const { team, points, reason } = game.lastHand || {}
-    const who = team === 0 ? 'Nosotros' : 'Ellos'
+  if (game.phase === 'round-over') {
+    const { winner, points } = game.lastRound || {}
     return style()
       .foreground(LIGHT)
-      .render(`  ${who} +${points} (${reason}) · ENTER para la próxima mano`)
+      .render(`  ${game.players[winner].name} se fue con ${points} puntos · ENTER para seguir`)
+  }
+
+  if (game.phase === 'choose-color' && game.chooser === 0) {
+    return style().bold(true).foreground(SKY).render('  Elegí el color que sigue')
   }
 
   if (game.currentActor() !== 0) {
@@ -466,22 +380,23 @@ function renderPrompt(game, view) {
       .render('  ' + view.message)
   }
 
-  return style()
-    .foreground(WHITE)
-    .render(`  ${game.phase === 'response' ? '¿Querés?' : 'Tu turno.'}`)
+  if (game.pending) {
+    return style()
+      .bold(true)
+      .foreground(SKY)
+      .render(`  Te caen ${game.pending.count} — respondé con ${game.pending.rank} o comelas`)
+  }
+
+  return style().foreground(WHITE).render('  Tu turno.')
 }
 
-// --- the whole frame ----------------------------------------------------
+// --- the whole frame -----------------------------------------------------
 
-// Row budgets per panel. The three columns come to the same height, which is
-// what makes the dashboard read as one grid.
-// The two panels that survive, side by side across the top.
-const TOP = { partida: 34, chat: 84, rows: 8 }
+const TOP = { partida: 34, chat: 84, rows: 7 }
 
 function renderGame(game, view) {
   const width = CANVAS.width
 
-  // Top: the little that is not already on the felt or in the score bar.
   const top = style.joinHorizontal(
     style.position.top,
     panel('PARTIDA', partidaLines(game), TOP.partida, TOP.rows),
@@ -489,31 +404,18 @@ function renderGame(game, view) {
     panel('CHAT / LOG', chatLines(game, TOP.chat - 2, TOP.rows - 3), TOP.chat, TOP.rows)
   )
 
-  // Middle: the table, with its four seats around it.
-  const mesa = renderMesa(game, view)
-
-  // Bottom: your hand, then every command on one line.
-  const cartas = pad(handLines(game, view), width)
-  const comandos = commandLine(game, width)
-  const aviso = view.message
-    ? style()
-        .bold(true)
-        .foreground(SKY)
-        .render('  ' + view.message)
-    : renderPrompt(game, view)
-
   const body = stack(
     renderHeader(game, view, width),
     renderScore(game, width),
     '',
     pad(top, width),
     '',
-    mesa,
+    renderMesa(game, view),
     '',
-    cartas
+    handLines(game, view)
   ).split('\n')
 
-  const foot = [aviso, comandos]
+  const foot = [renderPrompt(game, view), commandLine(game, width)]
   const gap = Math.max(0, CANVAS.height - body.length - foot.length)
 
   return fit([...body, ...Array(gap).fill(''), ...foot].join('\n'))
@@ -529,5 +431,5 @@ module.exports = {
   chatLines,
   handLines,
   panel,
-  MESA_WIDTH
+  FELT
 }
