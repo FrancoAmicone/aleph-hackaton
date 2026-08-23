@@ -138,8 +138,12 @@ function flankBeside(game, seat, view, align) {
 // The table is round: an ellipse drawn row by row, the felt inside it. Each
 // row's half-width comes from the ellipse equation, so the edge is smooth at
 // the top and bottom and widest in the middle, where the cards sit.
-const TABLE_ROWS = 13
-const TABLE_HALF_W = 23 // half the width at the widest row
+// Sized to look ROUND, not just closed. A terminal cell is about twice as
+// tall as wide, so a circle needs roughly twice as many columns as rows:
+// 38 wide by 19 tall is a 1:1 visual aspect. The content (two 7-wide cards
+// and the colour swatch) fits the 32-column hole at the widest row.
+const TABLE_ROWS = 19
+const TABLE_HALF_W = 19 // half the width at the widest row
 
 // Half-width of an ellipse at a given row. `a` is the horizontal radius; the
 // vertical radius is fixed by TABLE_ROWS.
@@ -149,6 +153,11 @@ function ellipseHalfWidth(row, a) {
   const x = a * Math.sqrt(Math.max(0, 1 - (y * y) / (b * b)))
   return Math.max(0, Math.round(x))
 }
+
+// A ring row is built as side + ring + hole + ring + side, mirrored about the
+// centre column. Each half-width is an integer, so every row is automatically
+// symmetric — but the two halves of the ring must be the same thickness, which
+// is what tableRow guarantees by deriving both from the same two half-widths.
 
 // The ring: the outer ellipse minus an inner one. Terminal cells are about
 // twice as tall as wide, so the ring has to be thicker in columns than in rows
@@ -167,6 +176,16 @@ function tableRow(row) {
   if (cap) outer = Math.max(outer, ellipseHalfWidth(RING_ROWS, TABLE_HALF_W - RING_W) + 2)
   const solid = cap || inner <= 0
   return { outer, inner: solid ? 0 : inner }
+}
+
+// Exactly `span` visible columns: content centred, then cut or padded to fit.
+// pad() alone can overshoot when the content is wider than the span, which
+// is what pushed the right side of the ring off-centre.
+function hole_(content, span) {
+  const w = style.width(content)
+  if (w > span) return style.truncate(content, span)
+  const left = Math.floor((span - w) / 2)
+  return ' '.repeat(left) + content + ' '.repeat(span - w - left)
 }
 
 function feltBlock(game, view) {
@@ -198,12 +217,13 @@ function feltBlock(game, view) {
       9
     )
   )
-  const inner = style.joinHorizontal(style.position.top, mazo, '   ', descarte, '   ', color)
+  // 9 + 2 + 9 + 2 + 9 = 31 columns, inside the 32-column hole at its widest.
+  const inner = style.joinHorizontal(style.position.top, mazo, '  ', descarte, '  ', color)
   const innerRows = inner.split('\n')
   const status = dealing ? dealLine(game, view) : stackLine(game)
 
   // Lay the content into the hole's middle rows, the status line under it.
-  const contentTop = Math.floor((TABLE_ROWS - innerRows.length - 2) / 2)
+  const contentTop = Math.floor((TABLE_ROWS - innerRows.length - 2) / 2) + 1
   const ring = style().foreground(MID)
   const rows = []
   for (let r = 0; r < TABLE_ROWS; r++) {
@@ -217,9 +237,13 @@ function feltBlock(game, view) {
     const span = hole * 2
     const ci = r - contentTop
     let body
-    if (ci >= 0 && ci < innerRows.length) body = pad(innerRows[ci], span)
-    else if (ci === innerRows.length + 1) body = pad(status, span)
-    else body = ' '.repeat(span)
+    if (ci >= 0 && ci < innerRows.length) body = innerRows[ci]
+    else if (ci === innerRows.length + 1) body = status
+    else body = ''
+    // The hole must be EXACTLY `span` wide regardless of what is in it, or the
+    // right-hand ring drifts by however much the content over- or undershoots
+    // the centre. Centre the content, then hard-cut the result to the span.
+    body = hole_(body, span)
     rows.push(side + ring.render('█'.repeat(band)) + body + ring.render('█'.repeat(band)) + side)
   }
   return tableSprite(rows.join('\n'), width)
@@ -243,7 +267,8 @@ function dealLine(game, view) {
   if (!flight) return style().faint(true).render('repartiendo…')
 
   const name = game.players[flight.seat].name
-  const track = 22
+  // 'mazo ' (5) + track + ' ▶ ' (3) + name must fit the hole's widest row.
+  const track = 14
   const at = Math.round(flight.t * (track - 1))
 
   let lane = ''

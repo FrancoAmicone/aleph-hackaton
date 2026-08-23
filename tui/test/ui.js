@@ -318,6 +318,21 @@ test('mesa: a closed ring of █, widest in the middle, no legs', (t) => {
   const mid = Math.floor(widths.length / 2)
   t.ok(widths[mid] > widths[0] && widths[mid] > widths[widths.length - 1], 'widest at the middle')
 
+  // Round means symmetric: every row's ring is the same thickness on both
+  // sides and centred on the same column. An odd width or a lopsided round-off
+  // would shear the circle and this is where it would show.
+  const centres = new Set()
+  for (const r of rows) {
+    const a = r.indexOf('█')
+    const b = r.lastIndexOf('█')
+    const seg = r.slice(a, b + 1)
+    const left = (seg.match(/^█+/) || [''])[0].length
+    const right = (seg.match(/█+$/) || [''])[0].length
+    t.is(left, right, 'ring is the same thickness on both sides')
+    centres.add((a + b) / 2)
+  }
+  t.is(centres.size, 1, `every row is centred on the same column (${[...centres].join(', ')})`)
+
   // The legs are gone.
   t.absent(plain.includes('║'), 'no legs')
   t.absent(plain.includes('╨'), 'no feet')
