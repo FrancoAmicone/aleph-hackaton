@@ -82,13 +82,6 @@ function renderResult(game, view) {
   const won = game.winner() === (view.me ?? 0)
   const winner = game.players[game.winner()]
 
-  // A win opens with fireworks and a loss with rain; the result is revealed
-  // once the show is done. `age` is frames since the screen came up;
-  // undefined means no animation.
-  if (won && view.age !== undefined && view.age < fireworks.FRAMES) {
-    return fit(fireworks.fireworks(view.age))
-  }
-
   // The headline carries all the colour: a row-by-row ramp, yellow down to
   // green for a win, orange down to red for a loss. Everything else is white.
   const ramp = won ? WIN_RAMP : LOSE_RAMP
@@ -144,10 +137,12 @@ function renderResult(game, view) {
   const spare = Math.max(0, CANVAS.height - body.split('\n').length)
   const final = fit('\n'.repeat(Math.floor(spare / 2)) + body)
 
-  // The rain falls over the finished result and lets it through as it eases.
-  if (!won && view.age !== undefined && view.age < rain.FRAMES) {
-    return rain.rain(view.age, final)
-  }
+  // A win opens with fireworks and a loss with rain, both drawn over the
+  // finished result and letting it through as they go. `age` is frames since
+  // the screen came up; undefined means no animation.
+  if (view.age === undefined) return final
+  if (won && view.age < fireworks.FRAMES) return fireworks.fireworks(view.age, final)
+  if (!won && view.age < rain.FRAMES) return rain.rain(view.age, final)
   return final
 }
 

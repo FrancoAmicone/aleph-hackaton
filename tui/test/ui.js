@@ -316,13 +316,22 @@ test('resultado: a win opens with fireworks, then reveals; a key skips them', (t
 
   const at = (age, me) => renderResult(game, { ...view, me, age })
 
-  // While the show is on: canvas-sized, something lit, no verdict yet.
+  // While the show is on: canvas-sized, something lit. Nothing of the result
+  // during the climb; it comes through with the burst and is all there by
+  // the end.
   for (const age of [0, 5, 12, FRAMES - 1]) {
     const frame = at(age, 1)
     t.is(lines(frame).length, CANVAS.height, `age ${age}: canvas rows`)
     t.is(widest(frame), CANVAS.width, `age ${age}: canvas columns`)
-    t.absent(stripAnsi(frame).includes('before anyone else'), `age ${age}: not revealed`)
   }
+  for (const age of [0, 5]) {
+    t.absent(stripAnsi(at(age, 1)).includes('before anyone else'), `age ${age}: not revealed`)
+  }
+  t.ok(
+    stripAnsi(at(FRAMES - 1, 1)).includes('before anyone else'),
+    'revealed before the sparks die'
+  )
+  t.is(at(FRAMES, 1), at(undefined, 1), 'and the last frame is the plain result')
   t.ok(stripAnsi(at(5, 1)).trim().length > 0, 'the sky is not empty')
   t.not(stripAnsi(at(5, 1)), stripAnsi(at(12, 1)), 'and it moves')
   t.ok(stripAnsi(at(FRAMES, 1)).includes('before anyone else'), 'revealed when the show ends')
