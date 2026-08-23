@@ -10,7 +10,7 @@ Equipo de 4 personas. Deadline de jurado: **domingo 23, 13:00 hora ARG**.
 El entregable es una **CLI standalone**, escrita para el runtime **Bare**, desplegada con la
 **Pear CLI**, instalable con `pear install pear://<key>` y con **updates OTA P2P** funcionando.
 
-Idea todavía abierta. Dirección probable: **un juego de terminal P2P**. Ver `docs/07-ideas.md`.
+**La idea está definida: `the-great-pear`**, un UNO de terminal P2P. El juego vive en `tui/`.
 
 **Idioma: responder siempre en español.** Código, nombres de variables y commits en inglés.
 
@@ -107,35 +107,40 @@ Referencia completa en `docs/02-pear-cli.md` y `docs/03-deploy-ota.md`.
 
 ## Estado
 
-### Riesgos técnicos — despejados ✅
+### ✅ Riesgos técnicos despejados
 
-Ambos verificados con código corrible en `spikes/`. Ver `docs/README.md`.
+- [x] **Input en tiempo real en Bare** — `bare-tty` da raw mode. → `spikes/01-raw-input/`
+- [x] **P2P con Hyperswarm** — discovery por sala, JSON con framing. → `spikes/02-hyperswarm/`
+- [x] **P2P ENTRE MÁQUINAS Y REDES DISTINTAS** — Franco ↔ Gino con `conectar.js` (HyperDHT por
+      clave directa): 7.7s y charla de 327s. Repetido desde otra red: 12.6s.
+- [x] **Pipeline completo verificado end-to-end en `test-msg/`**, incluido el **OTA**:
+      una instancia v1.0.1 detectó y aplicó la v1.0.2 sola, en 1 segundo.
 
-- [x] **Input en tiempo real en Bare** — `bare-tty` da raw mode. Flechas, espacio, Ctrl+C
-      limpio, y funciona dentro del template. → `spikes/01-raw-input/`
-- [x] **P2P con Hyperswarm** — discovery por nombre de sala, JSON con framing, detección de
-      desconexión, reconexión automática. → `spikes/02-hyperswarm/`
+### the-great-pear — estado del pipeline
 
-**Un juego de terminal en tiempo real es viable.** Con dos condiciones de diseño no negociables:
-heartbeat de aplicación para detectar peers caídos, y retry del `join` (el discovery falla
-~30% al primer intento). Detalle en `docs/04-p2p.md`.
+Key definitiva: **`pear://u9y7y9xqggifyeihhi9i1cswyqdrtdjbg75y6obxxy6hwe6uu66o`**
 
-### Pipeline — **NADA DE ESTO ESTÁ HECHO** 🔴
+- [x] `productName: the-great-pear` (define binario **y** storage — no se cambia después)
+- [x] `delay: 5000` en `lib/pear-cli.js` (sin esto el updater espera 1 hora)
+- [x] 5 plataformas cross-compiladas **desde el Mac** (la doc oficial dice que no se puede; se puede)
+- [x] `pear build` + `pear stage` → drive length 7, v2.0.0
+- [x] `pear seed` corriendo
+- [ ] `pear install` desde otra máquina
+- [ ] OTA demostrado sobre el juego
+- [ ] **Multijugador P2P** ← lo único que falta de verdad
 
-Es la prioridad #1 del proyecto y sigue en cero. Un juego perfecto sin OTA no califica.
+### Lecciones caras (no repetirlas)
 
-- [ ] Definir **quién genera y seedea la key** (bloquea todo lo de abajo — sólo esa máquina
-      puede publicar la v2, y tiene que estar viva durante el juzgado)
-- [ ] Template clonado como proyecto real (por ahora sólo existe dentro de `spikes/`)
-- [ ] `pear://` link generado y seedeando
-- [ ] Binario buildeado (`npm run make`)
-- [ ] Instalado vía `pear install` en otra máquina
-- [ ] OTA verificado end-to-end
+- **`pear build` es obligatorio.** Stagear `out/` publica **sin el binario**, en silencio,
+  porque `out/` está en `.gitignore` y `pear stage` lo respeta. Si el dry-run no lista los
+  binarios bajo `/by-arch/`, no stagees.
+- **Un test en UNA sola máquina no prueba nada de P2P.** HyperDHT toma un atajo por LAN
+  (`punches consistent=0`) y nunca ejercita el hole punching.
+- **El DHT devuelve claves de peers muertos.** Tus corridas viejas aparecen como "otro peer".
+- **`discovery.flushed()` resuelve cuando TU announce propagó**, no cuando encontraste a alguien.
+- **Conectar tarda 6-15s** y el discovery falla ~30% al primer intento → el lobby necesita
+  "buscando jugadores…" y retry.
+- **El cambio de comportamiento del updater sólo aplica desde la versión SIGUIENTE**: la copia
+  instalada corre su propio código.
 
-### Resto
-
-- [ ] Idea definida (ya no bloquea nada: los dos riesgos están despejados)
-- [ ] Discovery probado **entre dos máquinas distintas** (lo medido fue en una sola,
-      que es el peor caso de NAT)
-- [ ] Lógica de la app
-- [ ] README + video demo
+Bitácora completa: `test-msg/docs/` (13 documentos).
