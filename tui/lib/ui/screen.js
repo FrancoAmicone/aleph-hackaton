@@ -21,9 +21,6 @@ const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', 
 const FELT = 46
 const FLANK = 12
 
-// The shadow under the table: a dark grey, deliberately not a card colour.
-const SHADOW = 236 // #303030
-
 function stack(...blocks) {
   return blocks.filter((b) => b !== null && b !== undefined).join('\n')
 }
@@ -139,43 +136,32 @@ function flankBeside(game, seat, view, align) {
 // row's half-width comes from the ellipse equation, so the edge is smooth at
 // the top and bottom and widest in the middle, where the cards sit.
 // Sized to look ROUND, not just closed. A terminal cell is about twice as
-// tall as wide, so a circle needs roughly twice as many columns as rows:
-// 38 wide by 19 tall is a 1:1 visual aspect. The content (two 7-wide cards
-// and the colour swatch) fits the 32-column hole at the widest row.
-const TABLE_ROWS = 19
-const TABLE_HALF_W = 19 // half the width at the widest row
+// tall as wide, so a circle needs roughly twice as many columns as rows.
+// 46 wide by 23 tall is a 1:1 visual aspect, and 23 rows keeps the jump
+// between consecutive rows small enough that the edge reads as a curve
+// rather than a staircase.
+const TABLE_ROWS = 23
+const TABLE_HALF_W = 23
 
-// Half-width of an ellipse at a given row. `a` is the horizontal radius; the
-// vertical radius is fixed by TABLE_ROWS.
-function ellipseHalfWidth(row, a) {
-  const b = (TABLE_ROWS - 1) / 2
-  const y = row - b
-  const x = a * Math.sqrt(Math.max(0, 1 - (y * y) / (b * b)))
-  return Math.max(0, Math.round(x))
+// Half-width of an ellipse at a given row, for a horizontal radius `a` and a
+// vertical radius `b`.
+function ellipseHalfWidth(row, a, b, rows) {
+  const y = row - (rows - 1) / 2
+  if (Math.abs(y) >= b) return 0
+  return Math.max(0, Math.round(a * Math.sqrt(1 - (y * y) / (b * b))))
 }
 
-// A ring row is built as side + ring + hole + ring + side, mirrored about the
-// centre column. Each half-width is an integer, so every row is automatically
-// symmetric — but the two halves of the ring must be the same thickness, which
-// is what tableRow guarantees by deriving both from the same two half-widths.
-
-// The ring: the outer ellipse minus an inner one. Terminal cells are about
-// twice as tall as wide, so the ring has to be thicker in columns than in rows
-// to look the same all the way round — RING_W columns at the sides, and the
-// top and bottom rows solid across.
+// The ring is the outer ellipse minus an inner one shrunk on BOTH axes. Near
+// the top and bottom the inner ellipse runs out before the outer does, so
+// the band widens until the two sides meet — the ring closes as a curve,
+// with no flat cap drawn anywhere. RING_W is the thickness at the sides.
 const RING_W = 3
-const RING_ROWS = 1
 
 function tableRow(row) {
-  let outer = ellipseHalfWidth(row, TABLE_HALF_W)
-  const inner = ellipseHalfWidth(row, TABLE_HALF_W - RING_W)
-  // The top and bottom rows are the caps. At the very edge the ellipse rounds
-  // to nothing, so the cap is given a width of its own — wide enough to close
-  // the ring over the hole beneath it.
-  const cap = row < RING_ROWS || row >= TABLE_ROWS - RING_ROWS
-  if (cap) outer = Math.max(outer, ellipseHalfWidth(RING_ROWS, TABLE_HALF_W - RING_W) + 2)
-  const solid = cap || inner <= 0
-  return { outer, inner: solid ? 0 : inner }
+  const b = (TABLE_ROWS - 1) / 2
+  const outer = ellipseHalfWidth(row, TABLE_HALF_W, b, TABLE_ROWS)
+  const inner = ellipseHalfWidth(row, TABLE_HALF_W - RING_W, b - RING_W / 2, TABLE_ROWS)
+  return { outer, inner }
 }
 
 // Exactly `span` visible columns: content centred, then cut or padded to fit.
@@ -228,6 +214,7 @@ function feltBlock(game, view) {
   const rows = []
   for (let r = 0; r < TABLE_ROWS; r++) {
     const { outer, inner: hole } = tableRow(r)
+    if (outer === 0) continue
     const side = ' '.repeat(TABLE_HALF_W - outer)
     if (hole === 0) {
       rows.push(side + ring.render('█'.repeat(outer * 2)) + side)
@@ -246,17 +233,12 @@ function feltBlock(game, view) {
     body = hole_(body, span)
     rows.push(side + ring.render('█'.repeat(band)) + body + ring.render('█'.repeat(band)) + side)
   }
-  return tableSprite(rows.join('\n'), width)
+  return tableSprite(rows.join('\n'))
 }
 
-// A soft shadow under the disc, narrower than the table, so it reads as
-// resting on something rather than floating. No legs: the table is a ring.
-function tableSprite(top, width) {
-  const lines = top.split('\n')
-  const shadowW = width - 8
-  const shadow =
-    ' '.repeat(4) + style().foreground(SHADOW).render('░'.repeat(shadowW)) + ' '.repeat(4)
-  return [...lines, shadow].join('\n')
+// The table is the ring and nothing else — no floor, no shadow.
+function tableSprite(top) {
+  return top
 }
 
 // The bottom line of the felt during the deal: a card sliding from the pile

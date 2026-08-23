@@ -309,9 +309,26 @@ test('mesa: a closed ring of █, widest in the middle, no legs', (t) => {
     t.ok(ring.startsWith('█') && ring.endsWith('█'), 'ring ink on both edges')
   }
 
-  // The top and bottom rows are solid caps — no hole — so the ring is closed.
-  const caps = [rows[0], rows[rows.length - 1]]
-  for (const cap of caps) t.absent(cap.trim().includes(' '), 'the cap is unbroken')
+  // The ring closes as a CURVE, not a cap: the top and bottom rows are solid
+  // (the two sides have met), but they must be NARROWER than the rows just
+  // inside them — a flat cap would be as wide as or wider than its neighbour.
+  const w = (r) => r.lastIndexOf('█') - r.indexOf('█') + 1
+  const top = rows[0]
+  const bottom = rows[rows.length - 1]
+  t.absent(top.trim().includes(' '), 'the top row is solid')
+  t.absent(bottom.trim().includes(' '), 'the bottom row is solid')
+  t.ok(w(top) < w(rows[1]), `the top narrows into the curve (${w(top)} < ${w(rows[1])})`)
+  t.ok(
+    w(bottom) < w(rows[rows.length - 2]),
+    `the bottom narrows into the curve (${w(bottom)} < ${w(rows[rows.length - 2])})`
+  )
+
+  // No step bigger than a few columns between neighbouring rows: that is
+  // what "continuous curve" means in a grid.
+  for (let i = 1; i < rows.length; i++) {
+    t.ok(Math.abs(w(rows[i]) - w(rows[i - 1])) <= 12, `row ${i} steps gently from row ${i - 1}`)
+  }
+  t.absent(plain.includes('░'), 'no shadow')
 
   // Widest in the middle, narrowing toward both caps: that is what makes it round.
   const widths = rows.map((r) => r.lastIndexOf('█') - r.indexOf('█') + 1)
