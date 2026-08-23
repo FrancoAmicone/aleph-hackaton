@@ -906,7 +906,7 @@ test('program: plays a card through the real key decoder', async (t) => {
 
   const model = new App({
     version: '1.0.0',
-    flags: { jugar: true },
+    flags: { play: true },
     rng: seeded(3),
     think: { canto: 0, play: 0, say: 0, deal: 0 }
   })
@@ -922,7 +922,7 @@ test('program: plays a card through the real key decoder', async (t) => {
   const done = program.run()
   await new Promise((resolve) => setTimeout(resolve, 15))
 
-  t.is(model.screen, 'game', '--jugar dealt straight away')
+  t.is(model.screen, 'game', '--play dealt straight away')
 
   // Force a hand and a pile so the keystroke has a legal move to make.
   model.game.hands[0] = [card('rojo', 3), card('azul', 8)]

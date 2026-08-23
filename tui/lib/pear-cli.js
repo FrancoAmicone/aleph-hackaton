@@ -86,6 +86,10 @@ function createPearCli(pkg, opts = {}) {
     global.Bare.exit(0)
   }
 
+  // paparam ya imprimió el help, pero no corta la ejecución: sin esto el juego
+  // se abre encima de la ayuda que acabás de pedir.
+  if (cmd.flags.help) global.Bare.exit(0)
+
   const flags = cmd.flags
   const updates = flags.updates
   const storage = flags.storage || (isDev ? null : path.join(storageAPI.persistent(), appName))

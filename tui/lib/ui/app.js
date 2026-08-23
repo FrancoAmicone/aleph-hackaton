@@ -58,7 +58,7 @@ class App {
     this.menuIndex = 0
     this.settings = {
       jugadores: Number(this.flags.jugadores) || 4,
-      nivel: this.flags.nivel || 'normal',
+      nivel: this.flags.level || 'normal',
       meta: Number(this.flags.meta) || 500
     }
 
@@ -77,11 +77,11 @@ class App {
     this.updateStatus = null
     this._sayTag = 0
 
-    if (this.flags.jugar) this.startGame()
+    if (this.flags.play) this.startGame()
   }
 
   init() {
-    // The splash only plays on a clean launch into the menu. If --jugar dealt a
+    // The splash only plays on a clean launch into the menu. If --play dealt a
     // hand in the constructor, or the tests never call init(), we skip it and
     // the model behaves exactly as before.
     if (this.screen === 'menu' && this.think.frame !== 0) {
@@ -473,8 +473,8 @@ class App {
         return [this, null]
       }
 
-      const sala = this.flags.sala || 'general'
-      const nombre = this.flags.nombre || 'player'
+      const sala = this.flags.room || 'general'
+      const nombre = this.flags.name || 'player'
       this.online = { sala, anfitrion: item.id === 'create', peers: [], asientos: null }
       this.net({ t: 'join', sala, nombre, anfitrion: item.id === 'create' })
       this.message =

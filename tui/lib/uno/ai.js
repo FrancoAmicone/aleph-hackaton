@@ -1,17 +1,17 @@
 // The rivals. A policy over `game.legalActions(seat)` — it never reads a hand
 // it could not legally see, so the same function could drive a remote peer.
 //
-// Three levels: 'facil' plays whatever comes first and often forgets to call
-// UNO, 'normal' plays the odds, 'duro' saves its +4 for when it hurts and
+// Three levels: 'easy' plays whatever comes first and often forgets to call
+// UNO, 'normal' plays the odds, 'hard' saves its +4 for when it hurts and
 // catches you every time you sit on one card without saying anything.
 const { WILD_FOUR, DRAW_TWO, COLORS, value } = require('./deck')
 
-const LEVELS = ['facil', 'normal', 'duro']
+const LEVELS = ['easy', 'normal', 'hard']
 
 const PROFILE = {
-  facil: { callsUno: 0.55, catches: 0.15, savesWild: 0.1 },
+  easy: { callsUno: 0.55, catches: 0.15, savesWild: 0.1 },
   normal: { callsUno: 0.85, catches: 0.55, savesWild: 0.5 },
-  duro: { callsUno: 1, catches: 0.95, savesWild: 0.85 }
+  hard: { callsUno: 1, catches: 0.95, savesWild: 0.85 }
 }
 
 function decide(game, seat, rng = Math.random) {
