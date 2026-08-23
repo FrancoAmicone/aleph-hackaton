@@ -1,7 +1,7 @@
 {
   "name": "the-great-pear",
   "productName": "the-great-pear",
-  "version": "2.0.5",
+  "version": "2.0.6",
   "description": "The Great Pear — a terminal UNO game on Bare, delivered and updated peer-to-peer with Pear.",
   "private": true,
   "bin": "bin.js",
@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "b4a": "^1.8.1",
+    "bare-fs": "^4.5.1",
     "bare-os": "^3.9.0",
     "bare-path": "^3.0.0",
     "bare-storage": "^1.1.0",

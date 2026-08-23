@@ -6,6 +6,7 @@
 // screen is never corrupted by a stray console.log mid-hand.
 const createPearCli = require('./lib/pear-cli')
 const FramedStream = require('framed-stream')
+const fs = require('bare-fs')
 const b4a = require('b4a')
 const App = require('./lib/ui/app')
 const pkg = require('./package.json')
@@ -13,7 +14,28 @@ const pkg = require('./package.json')
 // Assigned once the Program starts; the updater handlers below fire later.
 let send = () => {}
 
-const status = (text, color) => send({ type: 'update-status', text, color })
+// Registro a archivo. La TUI se adueña de la pantalla completa, así que un
+// console.log acá no se ve nunca: o corrompe el render, o se pierde. Para
+// poder mirar la red mientras se juega, `--log <archivo>` vuelca cada mensaje
+// que cruza el IPC y se sigue desde otra terminal con `tail -f`.
+// Se asigna abajo, apenas paparam parsea los flags.
+let archivoLog = null
+const t0 = Date.now()
+
+function registrar(dir, texto) {
+  if (!archivoLog) return
+  const t = ((Date.now() - t0) / 1000).toFixed(1).padStart(6)
+  try {
+    fs.appendFileSync(archivoLog, `[+${t}s] ${dir} ${texto}\n`)
+  } catch {
+    // disco lleno o ruta inválida: el juego sigue, el log no es crítico
+  }
+}
+
+const status = (text, color) => {
+  registrar('++', text)
+  send({ type: 'update-status', text, color })
+}
 
 const cli = createPearCli(pkg, {
   flags: [
@@ -22,7 +44,8 @@ const cli = createPearCli(pkg, {
     ['--sin-flor', 'jugar sin flor'],
     ['--jugar', 'saltear el menú y repartir de una'],
     ['--sala <nombre>', 'sala de juego online (default: general)'],
-    ['--nombre <nombre>', 'tu nombre en la mesa']
+    ['--nombre <nombre>', 'tu nombre en la mesa'],
+    ['--log <archivo>', 'escribir el registro de red a un archivo (tail -f)']
   ],
   handlers: {
     onUpdating: () => status('⇣ bajando actualización…', 'brightyellow'),
@@ -58,6 +81,14 @@ const net = new FramedStream(worker)
 
 net.on('error', () => {})
 
+archivoLog = cli.flags.log || null
+
+if (archivoLog) {
+  try {
+    fs.writeFileSync(archivoLog, `=== ${pkg.name} v${pkg.version} — ${new Date().toISOString()} ===\n`)
+  } catch {}
+}
+
 net.on('data', (buf) => {
   let evento
   try {
@@ -65,12 +96,14 @@ net.on('data', (buf) => {
   } catch {
     return
   }
+  registrar('<<', JSON.stringify(evento))
   send({ type: 'net', evento })
 })
 
 // Lo que el modelo le manda al worker: join, action, start, leave.
 const enviarRed = (msg) => {
   try {
+    registrar('>>', JSON.stringify(msg))
     net.write(b4a.from(JSON.stringify(msg)))
   } catch {
     // el worker se está cerrando
