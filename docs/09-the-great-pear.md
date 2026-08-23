@@ -400,3 +400,83 @@ posible, y para 4 humanos es la salida honesta.
 | Menú crear/unirse | ✅ |
 | Tests | ✅ 772/772 |
 | **Probado entre máquinas reales** | ⬜ **falta** |
+
+---
+
+## 🔴 El bug del updater y las 3 trampas (23-ago)
+
+Tres cosas distintas se veían como "el OTA no anda". Las tres están resueltas y verificadas.
+
+### 1. La ruta del ejecutable — el bug de verdad
+
+`lib/pear-cli.js` resolvía la ruta del binario así:
+
+```js
+path.resolve(Bare.argv[0])     // ❌
+```
+
+Cuando el binario se invoca **por nombre** —que es lo normal, porque `pear install` lo deja en el
+PATH— `argv[0]` es sólo `the-great-pear`, sin ruta, y `resolve()` lo pega contra el directorio
+actual. En Windows además pierde el `.exe`.
+
+Síntoma real (Roman, Windows):
+```
+✗ falló la actualización: ENOENT: no such file or directory,
+  rename "\\?\C:\Users\rroma\the-great-pear" -> ...
+```
+Su carpeta home, y sin extensión: ese archivo no existe.
+
+**Reproducido antes de arreglar**, con un binario sonda invocado por nombre desde otro directorio:
+```
+argv[0]           : pathprobe
+path.resolve(a0)  : /private/tmp/pathprobe            ← inventada
+os.execPath()     : /private/tmp/fakebin/pathprobe    ← la real
+```
+
+**Fix:** `os.execPath()`, que devuelve la ruta real sin importar cómo se invocó.
+`argv[0]` queda sólo como último recurso.
+
+### 2. El updater roto no puede arreglarse a sí mismo
+
+La copia instalada corre **su propio código**. Las versiones 2.0.0 y 2.0.1 llevan el
+`path.resolve` malo compilado adentro: fallan al aplicar *cualquier* update, incluido el que
+trae el arreglo.
+
+**Hay que reinstalar a mano una vez.** Es la misma lección del `delay`, y vale como regla
+general: **un cambio en el updater sólo surte efecto a partir de la versión siguiente.**
+
+### 3. ⚠️ `pear install` se NIEGA a sobrescribir
+
+```
+Refusing to overwrite existing:
+  /Users/francoamicone/.local/bin/the-great-pear
+To reinstall, manually remove then rerun command
+```
+
+Reinstalar es en **dos pasos**:
+```bash
+rm -f ~/.local/bin/the-great-pear                       # Windows: borrar el .exe
+pear install pear://u9y7y9xqggifyeihhi9i1cswyqdrtdjbg75y6obxxy6hwe6uu66o
+```
+
+Sin el `rm`, `pear install` falla y uno queda en la versión vieja creyendo que reinstaló.
+
+### ✅ Verificación del OTA end-to-end
+
+Con la 2.0.4 instalada y **corriendo**, se publicó la 2.0.5:
+
+```
+$ the-great-pear --version
+the-great-pear v2.0.5      ← se actualizó sola, sin reinstalar
+```
+
+Funciona también el caso de arranque: si la versión ya estaba publicada cuando abrís la app,
+la aplica al inicio.
+
+### Cómo NO medir si está descargando
+
+Mirar si crece el storage (`~/Library/Application Support/<app>/pear-runtime/`) **no sirve**:
+el corestore reutiliza bloques y el tamaño queda plano aunque la descarga esté en curso.
+Estuve 5 minutos viendo 135MB fijos mientras el update se aplicaba igual.
+
+**La única señal confiable es `--version`.**
