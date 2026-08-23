@@ -578,3 +578,58 @@ descalabran; correrlo dos veces y usar la segunda.
 
 **Y esto no prueba P2P.** Dos procesos en la misma máquina toman un atajo por LAN y
 nunca ejercitan el hole punching. Sirve para verificar el cableado, no la red.
+
+---
+
+## Primera partida real entre máquinas (23-ago 09:38) — el P2P anda
+
+Franco (anfitrión) ↔ Gino (invitado), redes distintas, binario instalado por `pear install`:
+
+| | Franco | Gino |
+|---|---|---|
+| topic | `8efaf23174c8` | `8efaf23174c8` ✓ |
+| semilla | `6c1c6685…` | `6c1c6685…` ✓ |
+| miAsiento | 0 | 1 ✓ |
+| `peers` | +39.5s | +7.8s |
+| `start` | enviado | recibido ✓ |
+| `action` | recibida | enviada ✓ |
+
+**Una acción del engine cruzó el cable y llegó bien.** El lockstep funciona entre máquinas.
+
+Notar la asimetría del discovery: Gino encontró a Franco en 7.8s, Franco a Gino en 39.5s.
+Está dentro de lo esperado por el race de announce/lookup. **Dar 60s.**
+
+### Pero el render explotaba: la mesa estaba cableada a 4 jugadores
+
+```
+view error: Cannot read properties of undefined (reading 'length')
+```
+
+`renderMesa` tenía los asientos fijos: `seatLine(game, 2)`, `flankBeside(game, 3)`.
+Con 2 jugadores `game.hands[2]` es `undefined` y `dealtTo` reventaba en `.length`.
+
+Y había un segundo bug en la misma función, más silencioso: las posiciones eran
+**absolutas**, no relativas a `view.me`. Online, Gino veía a Franco sentado abajo —
+el lugar que tiene que ocupar uno mismo.
+
+**Arreglado:** las sillas se calculan como `(me + offset) % playerCount`, y la que
+no existe se omite conservando su ancho para que el frame no se corra.
+
+**Por qué no lo agarraron los tests:** todos construían mesas de 4. El modo local
+siempre es 1 humano + 3 bots, así que el caso nunca aparecía. Agregado
+`test/ui.js` → *"mesa: renders with 2 and 3 players, from every seat"*: 2, 3 y 4
+jugadores × cada asiento. Verificado que **falla** con el código viejo.
+
+### Lección
+
+El modo local con bots no es una prueba del modo online. Siempre tiene 4 jugadores
+y el asiento local siempre es 0 — justo las dos suposiciones que el online rompe.
+
+### Un log por corrida
+
+Dos instancias apuntando al mismo `--log` se pisan: el archivo queda con dos
+encabezados y las líneas intercaladas, imposible de leer. Usar un nombre por corrida:
+
+```bash
+the-great-pear --sala aleph --nombre franco --log ~/red-$(date +%H%M%S).log
+```

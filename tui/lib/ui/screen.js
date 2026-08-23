@@ -278,22 +278,49 @@ function stackLine(game) {
     .render(`▲ ${game.pending.count} cartas en juego (${game.pending.rank})`)
 }
 
+// Los cuatro lugares de la mesa, en orden de turno a partir del jugador local:
+// abajo soy yo, y de ahí derecha, arriba e izquierda.
+//
+// Antes esto era 0 abajo, 1 derecha, 2 arriba, 3 izquierda — fijo. Rompía de
+// dos maneras: con menos de cuatro jugadores `game.hands[2]` es undefined y el
+// render explotaba ("Cannot read properties of undefined"), y online cada uno
+// veía al asiento 0 sentado abajo aunque el de abajo tiene que ser uno mismo.
+function asientoEn(game, view, offset) {
+  const n = game.playerCount
+  if (offset >= n) return null // esa silla no existe en esta mesa
+  return ((view.me ?? 0) + offset) % n
+}
+
 function renderMesa(game, view) {
   const w = CANVAS.width
+  const abajo = asientoEn(game, view, 0)
+  const derecha = asientoEn(game, view, 1)
+  const arriba = asientoEn(game, view, 2)
+  const izquierda = asientoEn(game, view, 3)
+
+  // Una silla vacía sigue ocupando su columna: si no, la mesa se corre de lugar
+  // según cuánta gente haya y el ancho del frame deja de ser constante.
+  const flanco = (seat, align) =>
+    seat === null ? ' '.repeat(FLANK) : flankBeside(game, seat, view, align)
+
   // The flanks sit level with the felt, not with the legs: the felt is the
   // first rows of the sprite, so a top-aligned join puts the seat beside it
   // and lets the carpentry hang below on its own.
   const sprite = feltBlock(game, view)
   const table = style.joinHorizontal(
     style.position.top,
-    flankBeside(game, 3, view, 'right'),
+    flanco(izquierda, 'right'),
     ' ',
     sprite,
     ' ',
-    flankBeside(game, 1, view, 'left')
+    flanco(derecha, 'left')
   )
 
-  return stack(pad(seatLine(game, 2, view), w), pad(table, w), pad(seatLine(game, 0, view), w))
+  return stack(
+    pad(arriba === null ? '' : seatLine(game, arriba, view), w),
+    pad(table, w),
+    pad(abajo === null ? '' : seatLine(game, abajo, view), w)
+  )
 }
 
 // --- panels --------------------------------------------------------------

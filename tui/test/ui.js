@@ -281,6 +281,37 @@ test('panel: draws an exact rectangle whatever is inside it', (t) => {
   }
 })
 
+test('mesa: renders with 2 and 3 players, from every seat', (t) => {
+  // El multijugador online arranca con la gente que haya, no siempre con
+  // cuatro. Con menos, `game.hands[2]` no existe: la mesa tenía los asientos
+  // fijos en 0/1/2/3 y el render explotaba con "Cannot read properties of
+  // undefined (reading 'length')". Pasó en la primera partida real Franco-Gino.
+  for (const jugadores of [2, 3, 4]) {
+    const roster = Array.from({ length: jugadores }, (_, i) => ({
+      name: `p${i}`,
+      isAI: false,
+      level: 'normal'
+    }))
+
+    for (let me = 0; me < jugadores; me++) {
+      const game = new Game({ players: roster, rng: seeded(5) })
+      const frame = renderMesa(game, { ...view, me })
+
+      t.ok(frame.length > 0, `${jugadores} jugadores, asiento ${me}: renderiza`)
+      t.is(
+        widest(frame),
+        widest(renderMesa(new Game({ players: roster, rng: seeded(5) }), { ...view, me: 0 })),
+        `${jugadores} jugadores, asiento ${me}: mismo ancho que desde el asiento 0`
+      )
+      // Abajo va uno mismo: es lo que hace que la mesa sea legible online.
+      t.ok(
+        stripAnsi(frame).includes(`p${me}`),
+        `${jugadores} jugadores, asiento ${me}: me veo a mí mismo en la mesa`
+      )
+    }
+  }
+})
+
 test('mesa: never grows wider than the canvas, whatever is said', (t) => {
   const game = stacked({ top: card('rojo', 7), hands: [[card('rojo', 3)], [], [], []] })
 
