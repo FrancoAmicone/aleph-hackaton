@@ -41,7 +41,7 @@ const pipe = new FramedStream(Bare.IPC)
 
 const store = new Corestore(path.join(updaterConfig.dir, 'pear-runtime', 'corestore'))
 const updaterSwarm = new Hyperswarm()
-const pear = new PearRuntime({ ...updaterConfig, swarm: updaterSwarm, store })
+const pear = new PearRuntime({ ...updaterConfig, swarm: updaterSwarm, store, delay: 5000 })
 
 pear.updater.on('error', (err) => pipe.write(`[updater:error] ${err.message}`))
 
