@@ -59,6 +59,7 @@ function createPearCli(pkg, opts = {}) {
 
   const cmd = command(
     appName,
+    flag('--version|-v', 'print the version and exit'),
     flag('--storage <dir>', 'custom storage directory for pear-runtime'),
     flag('--no-updates', 'disable OTA updates for this run'),
     ...userFlags.map(([usage, description]) => flag(usage, description))
@@ -71,6 +72,19 @@ function createPearCli(pkg, opts = {}) {
   const isDev = path.basename(Bare.argv[0] || '').startsWith('bare')
 
   cmd.parse(global.Bare.argv.slice(isDev ? 2 : 1))
+
+  // --version has to answer BEFORE any of the peer-to-peer machinery exists.
+  // The app is a TUI, so the only other way to read the running version is to
+  // open it and read the log on screen — useless for scripting, and useless for
+  // confirming an OTA update landed. Printing straight to stdout (not through
+  // the buffered logger) keeps it pipeable: `the-great-pear --version`.
+  //
+  // Exiting here also avoids constructing the Corestore and the Hyperswarm just
+  // to tear them down again.
+  if (cmd.flags.version) {
+    console.log(`${appName} v${pkg.version}`)
+    global.Bare.exit(0)
+  }
 
   const flags = cmd.flags
   const updates = flags.updates

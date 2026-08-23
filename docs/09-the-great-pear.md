@@ -52,6 +52,13 @@ sh: bare: command not found
 `bin/bare` es un script de node con shebang, así que funciona igual en macOS, Linux y Windows.
 **No hace falta ningún symlink.**
 
+El mismo problema afecta a `npm test`: `brittle-bare` spawnea `bare` y no lo encuentra
+(`env: bare: No such file or directory`). Resuelto poniéndolo en el PATH del script:
+
+```json
+"test": "PATH=\"$PWD/node_modules/bare-runtime/bin:$PATH\" brittle-bare test/index.js"
+```
+
 Si preferís tener `bare` a mano en la terminal (opcional, y hay que rehacerlo tras cada
 `npm install`):
 ```bash
@@ -204,18 +211,18 @@ Ver `../test-msg/docs/12-ota-explicado.md` para el mecanismo completo. Lo espec�
 - La app arranca logueando `the-great-pear v2.0.0` y `Updates: enabled|disabled`; en la TUI eso
   entra como mensaje, no a stdout.
 
-### ⚠️ Falta un `--version`
+### ✅ `--version` para verificar el OTA
 
-`createPearCli` no define el flag `--version`:
-
-```
-$ the-great-pear --version
-Uncaught Bail: UNKNOWN_FLAG: version
+```bash
+the-great-pear --version     # o -v
+# the-great-pear v2.0.0
 ```
 
-Para verificar qué versión tiene alguien instalada hay que abrir el juego y mirar el log en
-pantalla. **Conviene agregarlo** — hace la verificación del OTA mucho más simple, tanto para
-nosotros como para el juez.
+Agregado en `lib/pear-cli.js`, y responde **antes** de construir el Corestore y el Hyperswarm:
+no levanta nada de red sólo para imprimir una línea.
+
+Es la forma de confirmar que un update aterrizó sin abrir el juego. Sin este flag había que
+entrar a la TUI y leer el log en pantalla — inservible para scriptear y para verificar un OTA.
 
 ---
 
@@ -230,6 +237,8 @@ nosotros como para el juez.
 | `pear build` + `pear stage` | ✅ drive length 7 |
 | `pear seed` | ✅ |
 | `pear install` verificado | ✅ 137 MB, queda en el PATH |
-| El juego corre en terminal real | ⬜ **falta que lo pruebe una persona** |
+| El juego corre en terminal real | ✅ verificado por Franco |
+| `--version` para verificar el OTA | ✅ |
+| Tests | ✅ 133/133 |
 | OTA sobre el juego | ⬜ |
 | **Multijugador P2P** | ⬜ **lo único que falta de verdad** |

@@ -8,7 +8,7 @@
   "upgrade": "pear://u9y7y9xqggifyeihhi9i1cswyqdrtdjbg75y6obxxy6hwe6uu66o",
   "scripts": {
     "format": "prettier . --write",
-    "test": "brittle-bare test/index.js",
+    "test": "PATH=\"$PWD/node_modules/bare-runtime/bin:$PATH\" brittle-bare test/index.js",
     "lint": "prettier . --check && lunte",
     "start": "node node_modules/bare-runtime/bin/bare bin.js --no-updates",
     "make": "node scripts/make.js",
