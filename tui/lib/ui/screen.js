@@ -210,7 +210,8 @@ function feltBlock(game, view) {
 
   // Lay the content into the hole's middle rows, the status line under it.
   const contentTop = Math.floor((TABLE_ROWS - innerRows.length - 2) / 2) + 1
-  const ring = style().foreground(MID)
+  // The table edge is white: structural chrome, not a card and not an accent.
+  const ring = style().foreground(WHITE)
   const rows = []
   for (let r = 0; r < TABLE_ROWS; r++) {
     const { outer, inner: hole } = tableRow(r)

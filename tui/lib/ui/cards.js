@@ -9,7 +9,7 @@
 // width-1 glyphs are used on a card — a two-column glyph that the terminal and
 // the layout engine disagree about would shear the whole hand.
 const { style } = require('../tea')
-const { CARD_COLORS, COMODIN, MID, STRONG } = require('./palette')
+const { CARD_COLORS, COMODIN, WHITE, STRONG } = require('./palette')
 
 // The game's mark. Used in the wordmark and the header, never on a card.
 const PEAR = '🍐'
@@ -78,7 +78,7 @@ function smallBack() {
   const inner = SMALL.width - 2
   return tint(
     ['┌' + '─'.repeat(inner) + '┐', '│' + '▚'.repeat(inner) + '│', '└' + '─'.repeat(inner) + '┘'],
-    MID,
+    WHITE,
     false
   ).join('\n')
 }
@@ -88,7 +88,7 @@ function bigBack() {
   const rows = ['┌' + '─'.repeat(inner) + '┐']
   for (let i = 0; i < BIG.height - 2; i++) rows.push('│' + '▚'.repeat(inner) + '│')
   rows.push('└' + '─'.repeat(inner) + '┘')
-  return tint(rows, MID, false).join('\n')
+  return tint(rows, WHITE, false).join('\n')
 }
 
 // An empty slot: nothing there yet.
@@ -105,7 +105,7 @@ function blank(width, height) {
 // drawn out, so somebody who ate a big stack cannot widen the row.
 function backsInline(count) {
   if (count <= 0) return style().faint(true).render('—')
-  const ink = style().foreground(MID)
+  const ink = style().foreground(WHITE)
   if (count <= 6) return ink.render(Array.from({ length: count }, () => '▚').join(' '))
   return ink.render(`▚▚▚ ×${count}`)
 }
