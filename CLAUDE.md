@@ -113,8 +113,9 @@ Referencia completa en `docs/02-pear-cli.md` y `docs/03-deploy-ota.md`.
 - [x] **P2P con Hyperswarm** — discovery por sala, JSON con framing. → `spikes/02-hyperswarm/`
 - [x] **P2P ENTRE MÁQUINAS Y REDES DISTINTAS** — Franco ↔ Gino con `conectar.js` (HyperDHT por
       clave directa): 7.7s y charla de 327s. Repetido desde otra red: 12.6s.
-- [x] **Pipeline completo verificado end-to-end en `test-msg/`**, incluido el **OTA**:
-      una instancia v1.0.1 detectó y aplicó la v1.0.2 sola, en 1 segundo.
+- [x] **Pipeline completo verificado end-to-end**, incluido el **OTA**: una instancia v1.0.1
+      detectó y aplicó la v1.0.2 sola, en 1 segundo. (Se probó sobre una app descartable,
+      `test-msg`, antes de fijar la key definitiva.)
 
 ### the-great-pear — estado del pipeline
 
@@ -143,4 +144,4 @@ Key definitiva: **`pear://u9y7y9xqggifyeihhi9i1cswyqdrtdjbg75y6obxxy6hwe6uu66o`*
 - **El cambio de comportamiento del updater sólo aplica desde la versión SIGUIENTE**: la copia
   instalada corre su propio código.
 
-Bitácora completa: `test-msg/docs/` (13 documentos).
+Manual operativo del juego: `docs/09-the-great-pear.md`.

@@ -1,7 +1,7 @@
 # the-great-pear — manual operativo
 
 Todos los comandos del juego, verificados el 23-ago-2026.
-El juego vive en `tui/`. La app de prueba `test-msg/` queda como banco de pruebas.
+El juego vive en `tui/`.
 
 ## La key
 
@@ -202,7 +202,7 @@ Conviene un segundo seeder de respaldo en otra máquina.
 
 ## El OTA
 
-Ver `../test-msg/docs/12-ota-explicado.md` para el mecanismo completo. Lo específico de acá:
+El mecanismo general está en `03-deploy-ota.md`. Lo específico de acá:
 
 - **`delay: 5000`** está aplicado en `tui/lib/pear-cli.js`. Sin eso el updater espera
   **hasta 1 hora** antes de buscar una versión nueva.
