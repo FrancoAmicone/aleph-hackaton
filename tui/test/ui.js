@@ -615,11 +615,28 @@ test('menu: two buttons, arrows switch, CREATE deals, JOIN says there is no room
   model.update(press('right'))
   t.is(model.menuIndex, 0, 'and it wraps rather than running off the end')
 
-  // No network yet: JOIN must say so, not pretend.
+  // Sin capa de red (este modelo se construye sin `net`), JOIN no puede
+  // inventar una sala: avisa y deja el menú vivo.
   model.menuIndex = 1
   model.update(press('enter'))
   t.is(model.screen, 'menu', 'JOIN stays on the menu')
-  t.ok(model.message && model.message.includes('salas'), 'and says there is no room to join')
+  t.ok(model.message && model.message.includes('red'), 'and says there is no network available')
+
+  // Con red, JOIN pide entrar a la sala en vez de rechazar.
+  const enviados = []
+  const conRed = new App({ net: (m) => enviados.push(m), think: { frame: 0 } })
+  conRed.menuIndex = 1
+  conRed.update(press('enter'))
+  t.is(conRed.screen, 'menu', 'JOIN stays on the menu until the room is up')
+  t.is(enviados.length, 1, 'JOIN asks the worker to join')
+  t.is(enviados[0].t, 'join', 'and the message is a join')
+  t.is(enviados[0].anfitrion, false, 'JOIN does not claim to be the host')
+
+  const creados = []
+  const creador = new App({ net: (m) => creados.push(m), think: { frame: 0 } })
+  creador.menuIndex = 0
+  creador.update(press('enter'))
+  t.is(creados[0].anfitrion, true, 'CREATE claims the host seat')
 
   model.menuIndex = 0
   model.update(press('enter'))

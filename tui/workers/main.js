@@ -14,11 +14,13 @@
 // Protocolo con la TUI
 //   TUI -> worker : { t: 'join', sala, nombre, anfitrion }
 //                   { t: 'action', action }
+//                   { t: 'start' }              (sólo el anfitrión)
 //                   { t: 'leave' }
 //   worker -> TUI : { t: 'estado', estado, ... }   buscando | anunciado
 //                   { t: 'peers', lista }
 //                   { t: 'seats', semilla, asientos }
 //                   { t: 'action', action }
+//                   { t: 'start' }
 //                   { t: 'peer-lost', nombre, motivo }
 //                   { t: 'error', mensaje }
 
@@ -59,6 +61,11 @@ pipe.on('data', async (buf) => {
 
       case 'action': {
         if (room) room.enviarAccion(msg.action)
+        break
+      }
+
+      case 'start': {
+        if (room) room.enviarInicio()
         break
       }
 

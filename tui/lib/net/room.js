@@ -149,12 +149,18 @@ class Room {
         if (this.esAnfitrion) break
         this.semilla = msg.semilla
         this.asientos = msg.asientos
-        this._emit({ t: 'seats', semilla: msg.semilla, asientos: msg.asientos })
+        this._emitSeats()
         break
 
       case 'action':
         // La acción del engine, tal cual. El seat viaja adentro.
         this._emit({ t: 'action', action: msg.action })
+        break
+
+      case 'start':
+        // Sólo el anfitrión da el arranque. Si dos peers repartieran o
+        // arrancaran, las partidas divergirían.
+        if (!this.esAnfitrion) this._emit({ t: 'start' })
         break
 
       case 'ping':
@@ -173,12 +179,32 @@ class Room {
 
     this.asientos = asientos
     this.broadcast({ t: 'seats', semilla: this.semilla, asientos })
-    this._emit({ t: 'seats', semilla: this.semilla, asientos })
+    this._emitSeats()
+  }
+
+  // El modelo necesita saber CUÁL de los asientos es el suyo: el juego está
+  // escrito asumiendo que "yo" soy un índice concreto, y online ese índice ya
+  // no es siempre 0. Lo resolvemos acá, que es donde se conoce la clave propia.
+  _emitSeats() {
+    const mio = (this.asientos || []).find((a) => a.clave === this.yo)
+    this._emit({
+      t: 'seats',
+      semilla: this.semilla,
+      asientos: this.asientos,
+      miAsiento: mio ? mio.seat : 0
+    })
   }
 
   // Manda una acción del engine a todos y la devuelve al modelo propio.
   enviarAccion(action) {
     this.broadcast({ t: 'action', action })
+  }
+
+  // El anfitrión da el arranque: todos construyen la partida con la semilla.
+  enviarInicio() {
+    if (!this.esAnfitrion) return
+    this.broadcast({ t: 'start' })
+    this._emit({ t: 'start' })
   }
 
   broadcast(msg) {

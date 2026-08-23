@@ -20,7 +20,8 @@
     "make:win32-arm64": "bare-build --name the-great-pear --standalone --host win32-arm64 --out ./out/win32-arm64 bin.js",
     "make:win32-x64": "bare-build --name the-great-pear --standalone --host win32-x64 --out ./out/win32-x64 bin.js",
     "start:updates": "node node_modules/bare-runtime/bin/bare bin.js --updates",
-    "net:test": "node scripts/net-test.js"
+    "net:test": "node scripts/net-test.js",
+    "lockstep:test": "node scripts/lockstep-test.js"
   },
   "dependencies": {
     "b4a": "^1.8.1",

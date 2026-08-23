@@ -299,11 +299,11 @@ function renderMesa(game, view) {
 // --- panels --------------------------------------------------------------
 
 // Only what the score line does not already carry.
-function partidaLines(game) {
+function partidaLines(game, view = {}) {
   const actor = game.currentActor()
   const rows = [
     ['Turno', actor === null ? '—' : game.players[actor].name],
-    ['Tu mano', `${game.hands[0].length} cartas`]
+    ['Tu mano', `${game.hands[view.me ?? 0].length} cartas`]
   ]
 
   return rows
@@ -361,7 +361,8 @@ function handWindow(total, selected) {
 
 function handLines(game, view) {
   // During the deal you see only what has reached you, face up as it lands.
-  const hand = game.hands[0].slice(0, dealtTo(game, 0, view))
+  const me = view.me ?? 0
+  const hand = game.hands[me].slice(0, dealtTo(game, me, view))
   const yours = view.dealt === undefined && game.currentActor() === 0 && game.phase === 'play'
 
   if (hand.length === 0) {
@@ -409,7 +410,7 @@ function renderScore(game, width, view = {}) {
   const fewest = Math.min(...game.hands.map((h) => h.length))
   const parts = game.players.map((p, seat) => {
     const n = game.hands[seat].length
-    const tone = seat === 0 ? SKY : n === fewest ? LIGHT : WHITE
+    const tone = seat === (view.me ?? 0) ? SKY : n === fewest ? LIGHT : WHITE
     return (
       style().foreground(tone).render(`${p.name} `) +
       style().bold(true).foreground(tone).render(String(n))
@@ -430,7 +431,7 @@ function renderScore(game, width, view = {}) {
 
 // What you can do right now, as [key, label] pairs, taken straight from the
 // engine's legal actions so the list can never drift from the rules.
-function commands(game) {
+function commands(game, view = {}) {
   if (game.phase === 'game-over') {
     return [
       ['ENTER', 'menú'],
@@ -459,7 +460,7 @@ function commands(game) {
     if (has('pass')) rows.push(['P', 'pasar'])
   }
 
-  if (has('uno')) rows.push(['U', game.unoWindow.seat === 0 ? '¡UNO!' : 'pescar'])
+  if (has('uno')) rows.push(['U', game.unoWindow.seat === (view.me ?? 0) ? '¡UNO!' : 'pescar'])
   rows.push(['ESC', 'menú'])
   return rows
 }
@@ -470,7 +471,7 @@ const OPTIONAL = ['elegir', 'jugar']
 
 function commandLine(game, width, view = {}) {
   if (view.dealt !== undefined) return ''
-  let rows = commands(game)
+  let rows = commands(game, view)
   if (rows.length === 0) return ''
 
   const render = (list) =>

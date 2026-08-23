@@ -6,6 +6,7 @@
 // while the rivals are playing.
 const { quit, tick, key } = require('../tea')
 const { Game } = require('../uno/engine')
+const { fromSeed } = require('../rng')
 const ai = require('../uno/ai')
 const { renderGame } = require('./screen')
 const { renderMenu, renderRules, MENU_ITEMS } = require('./menu')
@@ -31,6 +32,13 @@ class App {
     this.version = opts.version || '0.0.0'
     this.flags = opts.flags || {}
     this.rng = opts.rng || Math.random
+    // El asiento del jugador local. En modo local siempre es 0; online lo
+    // asigna el anfitrión, así que el modelo no puede asumir 0 en ningún lado.
+    this.me = 0
+    // net(msg) manda un mensaje al worker de red. null = modo local, sin red.
+    this.net = opts.net || null
+    // { sala, estado, anfitrion, peers, asientos, semilla } mientras hay sala.
+    this.online = null
     // Tests set this to 0 so a whole hand plays out without real delays.
     this.think = opts.think || { canto: THINK_CANTO, play: THINK_PLAY }
 
@@ -72,7 +80,7 @@ class App {
     if (this.think.frame === 0) return false
     if (this.screen === 'menu' || this.screen === 'result') return true
     if (this.screen !== 'game' || !this.game) return false
-    return this.dealing !== null || this.game.currentActor() !== 0
+    return this.dealing !== null || this.game.currentActor() !== this.me
   }
 
   _animate() {
@@ -83,10 +91,22 @@ class App {
 
   startGame() {
     const level = this.settings.nivel
-    const names = ['Vos', 'Rita', 'Coco', 'Nacho'].slice(0, this.settings.jugadores)
-    const roster = names.map((name, i) => ({ name, isAI: i > 0, level }))
 
-    this.game = new Game({ players: roster, target: this.settings.meta, rng: this.rng })
+    // Online: los asientos y la semilla los reparte el anfitrión. Todos los
+    // jugadores son humanos — no hay IA que sincronizar, y cada acción tiene
+    // un dueño inequívoco.
+    const online = this.online && this.online.asientos
+    const roster = online
+      ? this.online.asientos.map((a) => ({ name: a.nombre, isAI: false, level }))
+      : ['Vos', 'Rita', 'Coco', 'Nacho']
+          .slice(0, this.settings.jugadores)
+          .map((name, i) => ({ name, isAI: i > 0, level }))
+
+    // Misma semilla en todos los peers = mismo mazo. Es lo que permite mandar
+    // sólo las acciones por la red en vez del estado entero.
+    const rng = online ? fromSeed(this.online.semilla) : this.rng
+
+    this.game = new Game({ players: roster, target: this.settings.meta, rng })
     this.screen = 'game'
     this.selected = 0
     this.says = {}
@@ -126,9 +146,11 @@ class App {
     const game = this.game
     if (!game || game.phase === 'game-over') return null
     if (this.dealing !== null) return null
+    // Online no hay bots: cada asiento es una persona y su acción llega por red.
+    if (this.online) return null
 
     const seat = game.currentActor()
-    if (seat === null || seat === 0) return null
+    if (seat === null || seat === this.me) return null
 
     // A live UNO window gets a longer beat, so there is time to shout.
     const delay = game.unoWindow ? this.think.canto : this.think.play
@@ -138,7 +160,7 @@ class App {
   _runAI() {
     const game = this.game
     const seat = game.currentActor()
-    if (seat === null || seat === 0) return null
+    if (seat === null || seat === this.me) return null
 
     const action = ai.decide(game, seat, this.rng)
     if (!action) return null
@@ -147,7 +169,7 @@ class App {
     if (line) this.says = { ...this.says, [seat]: line }
 
     game.apply(action)
-    this.selected = Math.min(this.selected, Math.max(0, game.hands[0].length - 1))
+    this.selected = Math.min(this.selected, Math.max(0, game.hands[this.me].length - 1))
     if (game.isOver()) {
       this.screen = 'result'
       this.resultIndex = 0
@@ -204,6 +226,91 @@ class App {
       case 'key':
         return this._onKey(msg)
 
+      // Todo lo que llega del worker de red. El worker no sabe nada del juego:
+      // manda eventos y acá se decide qué hacer con ellos.
+      case 'net':
+        return this._onNet(msg.evento)
+
+      default:
+        return [this, null]
+    }
+  }
+
+  _onNet(e) {
+    if (!e) return [this, null]
+
+    switch (e.t) {
+      case 'estado':
+        if (e.estado === 'fuera') {
+          this.online = null
+          return [this, null]
+        }
+        this.online = { ...(this.online || {}), estado: e.estado, sala: e.sala }
+        // Conectar tarda entre 6 y 15 segundos: sin este cartel la pantalla
+        // parece colgada y la gente cierra el juego antes de que enganche.
+        this.message =
+          e.estado === 'buscando'
+            ? `Sala "${e.sala}" — buscando jugadores…`
+            : `Sala "${e.sala}" — anunciada, esperando…`
+        return [this, null]
+
+      case 'peers': {
+        const otros = e.lista.filter((p) => p.nombre).map((p) => p.nombre)
+        this.online = { ...(this.online || {}), peers: otros }
+        this.message = otros.length
+          ? `En la sala: vos + ${otros.join(', ')}`
+          : 'Sala vacía — esperando jugadores…'
+        return [this, null]
+      }
+
+      case 'seats':
+        // El asiento propio lo resuelve el worker, que es quien conoce la
+        // clave pública de este peer.
+        this.me = e.miAsiento
+        this.online = {
+          ...(this.online || {}),
+          asientos: e.asientos,
+          semilla: e.semilla
+        }
+        return [this, null]
+
+      case 'start':
+        if (!this.online || !this.online.asientos) return [this, null]
+        this.settings.jugadores = this.online.asientos.length
+        return [this, this.startGame()]
+
+      case 'action': {
+        // Una acción de otro jugador. Se aplica tal cual: todos los peers
+        // corren el mismo engine sobre el mismo mazo, así que el resultado
+        // es idéntico sin mandar estado.
+        if (!this.game || this.screen !== 'game') return [this, null]
+        this.game.apply(e.action)
+        this.selected = Math.min(
+          this.selected,
+          Math.max(0, this.game.hands[this.me].length - 1)
+        )
+        if (this.game.isOver()) {
+          this.screen = 'result'
+          this.resultIndex = 0
+        }
+        return [this, this._animate()]
+      }
+
+      case 'peer-lost':
+        // Sin IA no hay quien reemplace al que se fue: se avisa y todos vuelven
+        // al menú. Es la salida honesta para una partida de 4 humanos.
+        this.message = `${e.nombre} ${e.motivo} — partida cancelada`
+        this.screen = 'menu'
+        this.game = null
+        this.dealing = null
+        this.online = { ...(this.online || {}), asientos: null }
+        this.me = 0
+        return [this, this._animate()]
+
+      case 'error':
+        this.message = `Error de red: ${e.mensaje}`
+        return [this, null]
+
       default:
         return [this, null]
     }
@@ -246,13 +353,48 @@ class App {
       return [this, null]
     }
 
+    // Con una sala armada, ENTER arranca la partida (sólo el anfitrión puede).
+    if (key.matches(msg, 'enter', 'space') && this.online && this.online.asientos) {
+      if (!this.online.anfitrion) {
+        this.message = 'Esperá a que el anfitrión arranque la partida.'
+        return [this, null]
+      }
+      if (this.online.asientos.length < 2) {
+        this.message = 'Hacen falta al menos 2 jugadores.'
+        return [this, null]
+      }
+      if (this.net) this.net({ t: 'start' })
+      return [this, null]
+    }
+
     if (key.matches(msg, 'enter', 'space')) {
       const item = MENU_ITEMS[this.menuIndex]
-      if (item.id === 'create') return [this, this.startGame()]
-      // There is no network yet: a room to join does not exist. Say so rather
-      // than pretend, and keep the menu alive.
-      this.message = 'Todavía no hay salas para unirse — creá una.'
+
+      // Sin capa de red (tests, o el worker caído) el juego sigue siendo el de
+      // siempre: una partida local contra bots.
+      if (!this.net) {
+        if (item.id === 'create') return [this, this.startGame()]
+        this.message = 'No hay red disponible — jugá local.'
+        return [this, null]
+      }
+
+      const sala = this.flags.sala || 'general'
+      const nombre = this.flags.nombre || 'jugador'
+      this.online = { sala, anfitrion: item.id === 'create', peers: [], asientos: null }
+      this.net({ t: 'join', sala, nombre, anfitrion: item.id === 'create' })
+      this.message =
+        item.id === 'create'
+          ? `Creando sala "${sala}" — buscando jugadores…`
+          : `Entrando a "${sala}" — buscando…`
       return [this, null]
+    }
+
+    // L = jugar local contra bots, sin red. Es el modo de desarrollo: deja
+    // probar toda la UI sin coordinar a cuatro personas.
+    if (key.matches(msg, 'L')) {
+      this.online = null
+      this.me = 0
+      return [this, this.startGame()]
     }
 
     return [this, null]
@@ -317,25 +459,28 @@ class App {
     // Shouting UNO happens out of turn — to save yourself, or to catch a rival
     // who went quiet on one card.
     if (key.matches(msg, 'u') && game.unoWindow) {
-      return [this, this._act({ type: 'uno', seat: 0 }, game.legalActions(0))]
+      return [this, this._act({ type: 'uno', seat: this.me }, game.legalActions(this.me))]
     }
 
     // Naming a colour after a +4.
-    if (game.phase === 'choose-color' && game.chooser === 0) {
+    if (game.phase === 'choose-color' && game.chooser === this.me) {
       const colors = { r: 'rojo', a: 'amarillo', v: 'verde', z: 'azul' }
       for (const [chord, color] of Object.entries(colors)) {
         if (key.matches(msg, chord)) {
-          return [this, this._act({ type: 'color', seat: 0, color }, game.legalActions(0))]
+          return [
+            this,
+            this._act({ type: 'color', seat: this.me, color }, game.legalActions(this.me))
+          ]
         }
       }
       return [this, null]
     }
 
-    if (game.currentActor() !== 0) return [this, null]
+    if (game.currentActor() !== this.me) return [this, null]
 
-    const legal = game.legalActions(0)
+    const legal = game.legalActions(this.me)
     this.message = null
-    const hand = game.hands[0]
+    const hand = game.hands[this.me]
 
     if (key.matches(msg, 'left', 'h')) {
       this.selected = (this.selected - 1 + hand.length) % hand.length
@@ -374,8 +519,8 @@ class App {
 
   _play(card) {
     if (!card) return null
-    const action = { type: 'play', seat: 0, card }
-    const legal = this.game.legalActions(0)
+    const action = { type: 'play', seat: this.me, card }
+    const legal = this.game.legalActions(this.me)
 
     const allowed = legal.some(
       (a) => a.type === 'play' && a.card.color === card.color && a.card.rank === card.rank
@@ -402,8 +547,12 @@ class App {
       return null
     }
 
+    // Online: la acción viaja ANTES de aplicarse local, así el resto la ve
+    // cuanto antes. Todos aplican la misma acción sobre el mismo estado.
+    if (this.online && this.net) this.net({ t: 'action', action })
+
     this.game.apply(action)
-    this.selected = Math.min(this.selected, Math.max(0, this.game.hands[0].length - 1))
+    this.selected = Math.min(this.selected, Math.max(0, this.game.hands[this.me].length - 1))
     if (this.game.isOver()) {
       this.screen = 'result'
       this.resultIndex = 0
@@ -419,7 +568,13 @@ class App {
     // grow rather than served a second, reflowed layout.
     if (tooSmallFor(this.width, this.height)) return tooSmall(this.width, this.height)
 
-    const shared = { version: this.version, updateStatus: this.updateStatus, frame: this.frame }
+    const shared = {
+      version: this.version,
+      updateStatus: this.updateStatus,
+      frame: this.frame,
+      me: this.me,
+      online: this.online
+    }
 
     const canvas =
       this.screen === 'menu'

@@ -314,3 +314,89 @@ Ejercita `lib/net/room.js` sin TUI ni worker — sirve para probar la red aislad
    ventana le tumba el proceso al otro.
 2. **`clearInterval` en el teardown.** Los intervalos del refresh y del heartbeat mantienen vivo
    el event loop de Bare: sin limpiarlos el worker no termina nunca.
+
+---
+
+## Multijugador (Fase 3) — ✅ lockstep verificado
+
+### El dilema de los asientos
+
+El juego nació single-player: **"vos" eras siempre el asiento 0**. `hands[0]` tu mano,
+`currentActor() !== 0` "no es tu turno". Estaba así en 16 lugares.
+
+Online los cuatro comparten **un solo estado**, y cada uno es un asiento distinto. "Asiento 0"
+pasa a significar "el anfitrión", para todos.
+
+Se evaluó **rotar** los asientos —que cada peer se relabele como 0— y **se descartó**: dos
+jugadores renderizarían `hands[0]` y ambos creerían tener la primera mano repartida.
+
+La solución es `this.me`: el modelo sabe qué asiento es. 12 reemplazos en `lib/ui/app.js` y 4 en
+`lib/ui/screen.js`, todos mecánicos. **Con `me = 0` por defecto el modo local queda idéntico.**
+
+### Cómo se sincroniza
+
+```
+anfitrión: crea sala → sortea semilla → reparte asientos → da el arranque
+todos:     new Game({ players: asientos, rng: fromSeed(semilla) })
+           → mismo mazo, mismas manos
+jugada:    _act() manda la acción por red ANTES de aplicarla local
+           el resto la recibe y hace game.apply(action)
+```
+
+Por el cable viajan **sólo acciones** (`{ type, seat, card }`). Cero estado.
+
+`lib/rng.js` (mulberry32) hace posible el reparto determinístico. Verificado: misma semilla →
+mismas manos y misma carta arriba; semilla distinta → mazo distinto.
+
+### Resultado de la prueba de lockstep
+
+Dos peers jugando una partida entera, cada uno eligiendo acciones legales al azar:
+
+```
+anfitriona  245 acciones  {"manos":[5,7],"top":{"color":"amarillo","rank":9},"turno":1,"mazo":12}
+invitado    245 acciones  {"manos":[5,7],"top":{"color":"amarillo","rank":9},"turno":1,"mazo":12}
+```
+
+**Huellas idénticas.** Mismas manos, misma carta arriba, mismo turno, mismo color activo, mismo
+mazo restante — sin haber mandado una sola vez el estado.
+
+```bash
+cd tui
+npm run lockstep:test -- anfitriona misala anfitrion 55000   # terminal 1
+npm run lockstep:test -- invitado   misala -         52000   # terminal 2
+```
+
+### Cómo se juega online
+
+```bash
+the-great-pear --sala mipartida --nombre franco
+```
+
+En el menú:
+
+| Tecla | Qué hace |
+|---|---|
+| `CREATE ROOM` + ENTER | crea la sala y espera jugadores (sos el anfitrión) |
+| `JOIN ROOM` + ENTER | entra a la sala de `--sala` |
+| ENTER (con jugadores) | **el anfitrión** arranca la partida |
+| `L` | partida **local** contra bots, sin red |
+
+`L` es el modo de desarrollo: deja probar toda la UI sin coordinar a cuatro personas.
+
+### Si alguien se cae
+
+El heartbeat lo detecta en ~6s y **la partida se cancela**: cartel
+`"Fulano se desconectó — partida cancelada"` y todos vuelven al menú. Sin IA no hay reemplazo
+posible, y para 4 humanos es la salida honesta.
+
+### Estado
+
+| | |
+|---|---|
+| RNG determinístico por semilla | ✅ |
+| Asiento propio (`me`) | ✅ modo local intacto |
+| Acciones por red | ✅ |
+| Lockstep con partida entera | ✅ **huellas idénticas tras 245 acciones** |
+| Menú crear/unirse | ✅ |
+| Tests | ✅ 772/772 |
+| **Probado entre máquinas reales** | ⬜ **falta** |
