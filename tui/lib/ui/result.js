@@ -10,8 +10,8 @@ const { MID, WHITE } = require('./palette')
 const { bars, SPEED } = require('./bars')
 
 const BUTTONS = [
-  { id: 'menu', label: 'VOLVER AL MENÚ' },
-  { id: 'rematch', label: 'REVANCHA' }
+  { id: 'menu', label: 'BACK TO MENU' },
+  { id: 'rematch', label: 'REMATCH' }
 ]
 
 // A 5-row block font for the two headlines.
@@ -69,8 +69,8 @@ function renderResult(game, view) {
     .join('\n')
 
   const verdict = won
-    ? style().foreground(WHITE).render('Te quedaste sin cartas antes que nadie.')
-    : style().foreground(WHITE).render(`${winner.name} se quedó sin cartas primero.`)
+    ? style().foreground(WHITE).render('You ran out of cards before anyone else.')
+    : style().foreground(WHITE).render(`${winner.name} ran out of cards first.`)
 
   // What everyone was left holding, so the result reads as earned.
   const left = game.players
@@ -81,7 +81,7 @@ function renderResult(game, view) {
     })
     .join(style().faint(true).render('  ·  '))
 
-  const inner = 'VOLVER AL MENÚ'.length * 2 - 1 + 4 + 6
+  const inner = 'BACK TO MENU'.length * 2 - 1 + 4 + 6
   const row = style.joinHorizontal(
     style.position.top,
     button(BUTTONS[0].label, view.index === 0, inner).join('\n'),
@@ -89,7 +89,7 @@ function renderResult(game, view) {
     button(BUTTONS[1].label, view.index === 1, inner).join('\n')
   )
 
-  const hint = style().foreground(244).render('←/→ elegir   ·   ↵ entrar')
+  const hint = style().foreground(244).render('←/→ select   ·   ↵ enter')
   const t = (view.frame || 0) * SPEED
 
   return fit(
@@ -101,7 +101,7 @@ function renderResult(game, view) {
       '',
       pad(verdict, width),
       '',
-      pad(style().faint(true).render('cartas que quedaron en mano'), width),
+      pad(style().faint(true).render('cards left in hand'), width),
       pad(left, width),
       '',
       '',

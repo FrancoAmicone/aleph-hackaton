@@ -2,10 +2,10 @@
 //
 //   PARTIDA │ CHAT / LOG          <- the little that is not on the felt
 //              Coco
-//   Nacho  ╭ mazo · descarte ╮  Rita
-//              Vos
-//           tus cartas
-//   [1-9] jugar · [D] robar · …   <- every command, one line
+//   Nacho  ╭ deck · discard ╮  Rita
+//              You
+//           your cards
+//   [1-9] play · [D] draw · …   <- every command, one line
 //
 // Pure: every function takes the game plus a view-state bag and returns a
 // string, drawn at the fixed canvas size. Nothing here reads the terminal or
@@ -13,6 +13,9 @@
 const { style } = require('../tea')
 const cards = require('./cards')
 const { SKY, LIGHT, BLUE, MID, STRONG, WHITE, CARD_COLORS } = require('./palette')
+
+// The engine names colours in Spanish; the screen speaks English.
+const COLOR_NAMES = { rojo: 'red', amarillo: 'yellow', verde: 'green', azul: 'blue' }
 const { CANVAS, pad, fit } = require('./canvas')
 
 // Frames of the spinner shown while the rivals are thinking.
@@ -86,7 +89,7 @@ function seatLine(game, seat, view) {
   // while the deal is still handing cards out.
   const alarm =
     count === 1 && view.dealt === undefined
-      ? style().bold(true).foreground(SKY).render(' ¡UNO!')
+      ? style().bold(true).foreground(SKY).render(' UNO!')
       : ''
   const said = view.says && view.says[seat]
   const bubble = said ? '  ' + style().italic(true).foreground(SKY).render(`«${said}»`) : ''
@@ -107,7 +110,7 @@ function flankLine(game, seat, view, align) {
 
   const rows = [name, cards.backsInline(count)]
   if (count === 1 && view.dealt === undefined) {
-    rows.push(style().bold(true).foreground(SKY).render('¡UNO!'))
+    rows.push(style().bold(true).foreground(SKY).render('UNO!'))
   }
   const said = view.says && view.says[seat]
   if (said) rows.push(style().italic(true).foreground(SKY).render(`«${said}»`))
@@ -116,7 +119,7 @@ function flankLine(game, seat, view, align) {
 }
 
 // A flank centred on the felt's rows. Built to a fixed height so the seat
-// stays put whether or not it has a ¡UNO! or a speech bubble that frame.
+// stays put whether or not it has a UNO! or a speech bubble that frame.
 function flankBeside(game, seat, view, align) {
   const rows = flankLine(game, seat, view, align).split('\n')
   const feltRows = TABLE_ROWS
@@ -184,14 +187,14 @@ function feltBlock(game, view) {
     ? game.draw.length + (game.playerCount * 5 - view.dealt)
     : game.draw.length
   const mazo = stack(
-    pad(style().faint(true).render(`MAZO ${pileCount}`), 9),
+    pad(style().faint(true).render(`DECK ${pileCount}`), 9),
     pad(cards.bigBack(), 9)
   )
   const descarte = stack(
-    pad(style().faint(true).render('DESCARTE'), 9),
+    pad(style().faint(true).render('DISCARD'), 9),
     pad(dealing ? cards.bigBack() : cards.big(game.top), 9)
   )
-  const colorLabel = dealing ? '—' : game.activeColor || '—'
+  const colorLabel = dealing ? '—' : COLOR_NAMES[game.activeColor] || '—'
   const color = stack(
     pad(style().faint(true).render('COLOR'), 9),
     '',
@@ -247,10 +250,10 @@ function tableSprite(top) {
 // the right.
 function dealLine(game, view) {
   const flight = inFlight(game, view)
-  if (!flight) return style().faint(true).render('repartiendo…')
+  if (!flight) return style().faint(true).render('dealing…')
 
   const name = game.players[flight.seat].name
-  // 'mazo ' (5) + track + ' ▶ ' (3) + name must fit the hole's widest row.
+  // 'deck ' (5) + track + ' ▶ ' (3) + name must fit the hole's widest row.
   const track = 14
   const at = Math.round(flight.t * (track - 1))
 
@@ -258,7 +261,7 @@ function dealLine(game, view) {
   for (let i = 0; i < track; i++) lane += i === at ? '▚' : '·'
 
   return (
-    style().faint(true).render('mazo ') +
+    style().faint(true).render('deck ') +
     style().foreground(MID).render(lane.slice(0, at)) +
     style().bold(true).foreground(SKY).render('▚') +
     style()
@@ -271,11 +274,11 @@ function dealLine(game, view) {
 
 // A live +2/+4 stack is the most urgent thing on the table.
 function stackLine(game) {
-  if (!game.pending) return style().faint(true).render('sin deudas')
+  if (!game.pending) return style().faint(true).render('no stack')
   return style()
     .bold(true)
     .foreground(SKY)
-    .render(`▲ ${game.pending.count} cartas en juego (${game.pending.rank})`)
+    .render(`▲ ${game.pending.count} cards pending (${game.pending.rank})`)
 }
 
 // Los cuatro lugares de la mesa, en orden de turno a partir del jugador local:
@@ -329,14 +332,14 @@ function renderMesa(game, view) {
 function partidaLines(game, view = {}) {
   const actor = game.currentActor()
   const rows = [
-    ['Turno', actor === null ? '—' : game.players[actor].name],
-    ['Tu mano', `${game.hands[view.me ?? 0].length} cartas`]
+    ['Turn', actor === null ? '—' : game.players[actor].name],
+    ['Your hand', `${game.hands[view.me ?? 0].length} cards`]
   ]
 
   return rows
     .map(
       ([term, value]) =>
-        style().foreground(WHITE).render(term.padEnd(9)) +
+        style().foreground(WHITE).render(term.padEnd(10)) +
         style().bold(true).foreground(SKY).render(value)
     )
     .join('\n')
@@ -348,7 +351,7 @@ function chatLines(game, width, height) {
 
   for (const event of game.events.slice(-height * 2)) {
     const who =
-      event.seat === null || event.seat === undefined ? 'MESA' : game.players[event.seat].name
+      event.seat === null || event.seat === undefined ? 'TABLE' : game.players[event.seat].name
     const tone =
       event.kind === 'score'
         ? SKY
@@ -393,7 +396,7 @@ function handLines(game, view) {
   const yours = view.dealt === undefined && game.currentActor() === me && game.phase === 'play'
 
   if (hand.length === 0) {
-    const text = view.dealt === undefined ? '(sin cartas)' : 'repartiendo…'
+    const text = view.dealt === undefined ? '(no cards)' : 'dealing…'
     return pad(style().faint(true).render(text), CANVAS.width)
   }
 
@@ -417,7 +420,7 @@ function handLines(game, view) {
 
   // Say what is off-screen rather than pretending the hand is only this long.
   const hidden = hand.length - shown.length
-  const more = hidden > 0 ? style().faint(true).render(`  +${hidden} fuera de vista`) : ''
+  const more = hidden > 0 ? style().faint(true).render(`  +${hidden} off-screen`) : ''
 
   return stack(pad(row, CANVAS.width), pad(numbers + more, CANVAS.width))
 }
@@ -449,7 +452,7 @@ function renderScore(game, width, view = {}) {
     ? style()
         .foreground(view.updateStatus.color)
         .render(view.updateStatus.text + ' ')
-    : style().faint(true).render('cartas en mano ')
+    : style().faint(true).render('cards in hand ')
   const room = width - style.width(left) - style.width(right)
   return left + ' '.repeat(Math.max(1, room)) + right
 }
@@ -461,14 +464,14 @@ function renderScore(game, width, view = {}) {
 function commands(game, view = {}) {
   if (game.phase === 'game-over') {
     return [
-      ['ENTER', 'menú'],
-      ['ESC', 'salir']
+      ['ENTER', 'menu'],
+      ['ESC', 'quit']
     ]
   }
   if (game.phase === 'round-over') {
     return [
-      ['ENTER', 'seguir'],
-      ['ESC', 'menú']
+      ['ENTER', 'continue'],
+      ['ESC', 'menu']
     ]
   }
 
@@ -482,22 +485,22 @@ function commands(game, view = {}) {
   const rows = []
 
   if (has('color')) {
-    rows.push(['R', 'rojo'], ['A', 'amarillo'], ['V', 'verde'], ['Z', 'azul'])
+    rows.push(['R', 'red'], ['Y', 'yellow'], ['G', 'green'], ['B', 'blue'])
   } else {
-    if (has('play')) rows.push(['1-9', 'jugar'], ['←/→', 'elegir'], ['ENTER', 'tirar'])
-    if (has('draw')) rows.push(['D', 'robar'])
-    if (has('take')) rows.push(['D', `comer ${game.pending.count}`])
-    if (has('pass')) rows.push(['P', 'pasar'])
+    if (has('play')) rows.push(['1-9', 'play'], ['←/→', 'select'], ['ENTER', 'throw'])
+    if (has('draw')) rows.push(['D', 'draw'])
+    if (has('take')) rows.push(['D', `take ${game.pending.count}`])
+    if (has('pass')) rows.push(['P', 'pass'])
   }
 
-  if (has('uno')) rows.push(['U', game.unoWindow.seat === (view.me ?? 0) ? '¡UNO!' : 'pescar'])
-  rows.push(['ESC', 'menú'])
+  if (has('uno')) rows.push(['U', game.unoWindow.seat === (view.me ?? 0) ? 'UNO!' : 'catch'])
+  rows.push(['ESC', 'menu'])
   return rows
 }
 
 // One line under the hand. If the full set does not fit, the softest hints go
 // before the ones that actually move the game on.
-const OPTIONAL = ['elegir', 'jugar']
+const OPTIONAL = ['select', 'play']
 
 function commandLine(game, width, view = {}) {
   if (view.dealt !== undefined) return ''
@@ -528,7 +531,7 @@ function commandLine(game, width, view = {}) {
 // The line that says what the game is waiting for.
 function renderPrompt(game, view) {
   if (view.dealt !== undefined) {
-    return style().foreground(WHITE).render(`  Reparte ${game.players[game.dealer].name}…`)
+    return style().foreground(WHITE).render(`  ${game.players[game.dealer].name} deals…`)
   }
 
   if (game.phase === 'game-over') {
@@ -538,8 +541,8 @@ function renderPrompt(game, view) {
       .foreground(won ? SKY : MID)
       .render(
         won
-          ? '  ¡GANASTE LA PARTIDA!  ENTER para volver al menú'
-          : `  Ganó ${game.players[game.winner()].name}.  ENTER para volver al menú`
+          ? '  YOU WON THE GAME!  ENTER to go back to the menu'
+          : `  ${game.players[game.winner()].name} won.  ENTER to go back to the menu`
       )
   }
 
@@ -547,11 +550,11 @@ function renderPrompt(game, view) {
     const { winner, points } = game.lastRound || {}
     return style()
       .foreground(LIGHT)
-      .render(`  ${game.players[winner].name} se fue con ${points} puntos · ENTER para seguir`)
+      .render(`  ${game.players[winner].name} went out with ${points} points · ENTER to continue`)
   }
 
   if (game.phase === 'choose-color' && game.chooser === (view.me ?? 0)) {
-    return style().bold(true).foreground(SKY).render('  Elegí el color que sigue')
+    return style().bold(true).foreground(SKY).render('  Pick the next colour')
   }
 
   if (game.currentActor() !== (view.me ?? 0)) {
@@ -559,7 +562,7 @@ function renderPrompt(game, view) {
     const name = game.players[game.currentActor()].name
     return (
       style().foreground(SKY).render(`  ${spin} `) +
-      style().foreground(WHITE).render(`${name} está pensando…`)
+      style().foreground(WHITE).render(`${name} is thinking…`)
     )
   }
 
@@ -574,10 +577,12 @@ function renderPrompt(game, view) {
     return style()
       .bold(true)
       .foreground(SKY)
-      .render(`  Te caen ${game.pending.count} — respondé con ${game.pending.rank} o comelas`)
+      .render(
+        `  ${game.pending.count} coming your way — answer with a ${game.pending.rank} or take them`
+      )
   }
 
-  return style().foreground(WHITE).render('  Tu turno.')
+  return style().foreground(WHITE).render('  Your turn.')
 }
 
 // --- the whole frame -----------------------------------------------------
@@ -589,7 +594,7 @@ function renderGame(game, view) {
   // table. The panels this replaced spent seven rows on the same thing.
   const actor = game.currentActor()
   const turno =
-    style().faint(true).render('turno ') +
+    style().faint(true).render('turn ') +
     style()
       .bold(true)
       .foreground(SKY)

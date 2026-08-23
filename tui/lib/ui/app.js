@@ -98,7 +98,7 @@ class App {
     const online = this.online && this.online.asientos
     const roster = online
       ? this.online.asientos.map((a) => ({ name: a.nombre, isAI: false, level }))
-      : ['Vos', 'Rita', 'Coco', 'Nacho']
+      : ['You', 'Rita', 'Coco', 'Nacho']
           .slice(0, this.settings.jugadores)
           .map((name, i) => ({ name, isAI: i > 0, level }))
 
@@ -250,16 +250,16 @@ class App {
         // parece colgada y la gente cierra el juego antes de que enganche.
         this.message =
           e.estado === 'buscando'
-            ? `Sala "${e.sala}" — buscando jugadores…`
-            : `Sala "${e.sala}" — anunciada, esperando…`
+            ? `Room "${e.sala}" — looking for players…`
+            : `Room "${e.sala}" — announced, waiting…`
         return [this, null]
 
       case 'peers': {
         const otros = e.lista.filter((p) => p.nombre).map((p) => p.nombre)
         this.online = { ...(this.online || {}), peers: otros }
         this.message = otros.length
-          ? `En la sala: vos + ${otros.join(', ')}`
-          : 'Sala vacía — esperando jugadores…'
+          ? `In the room: you + ${otros.join(', ')}`
+          : 'Empty room — waiting for players…'
         return [this, null]
       }
 
@@ -285,10 +285,7 @@ class App {
         // es idéntico sin mandar estado.
         if (!this.game || this.screen !== 'game') return [this, null]
         this.game.apply(e.action)
-        this.selected = Math.min(
-          this.selected,
-          Math.max(0, this.game.hands[this.me].length - 1)
-        )
+        this.selected = Math.min(this.selected, Math.max(0, this.game.hands[this.me].length - 1))
         if (this.game.isOver()) {
           this.screen = 'result'
           this.resultIndex = 0
@@ -299,7 +296,7 @@ class App {
       case 'peer-lost':
         // Sin IA no hay quien reemplace al que se fue: se avisa y todos vuelven
         // al menú. Es la salida honesta para una partida de 4 humanos.
-        this.message = `${e.nombre} ${e.motivo} — partida cancelada`
+        this.message = `${e.nombre} ${e.motivo} — game cancelled`
         this.screen = 'menu'
         this.game = null
         this.dealing = null
@@ -308,7 +305,7 @@ class App {
         return [this, this._animate()]
 
       case 'error':
-        this.message = `Error de red: ${e.mensaje}`
+        this.message = `Network error: ${e.mensaje}`
         return [this, null]
 
       default:
@@ -356,11 +353,11 @@ class App {
     // Con una sala armada, ENTER arranca la partida (sólo el anfitrión puede).
     if (key.matches(msg, 'enter', 'space') && this.online && this.online.asientos) {
       if (!this.online.anfitrion) {
-        this.message = 'Esperá a que el anfitrión arranque la partida.'
+        this.message = 'Wait for the host to start the game.'
         return [this, null]
       }
       if (this.online.asientos.length < 2) {
-        this.message = 'Hacen falta al menos 2 jugadores.'
+        this.message = 'At least 2 players are needed.'
         return [this, null]
       }
       if (this.net) this.net({ t: 'start' })
@@ -373,7 +370,7 @@ class App {
     // discovery tarda 6-15s y falla ~30% al primer intento, así que esta
     // ventana de espera es justo cuando la gente aprieta teclas.
     if (key.matches(msg, 'enter', 'space') && this.online) {
-      this.message = `Sala "${this.online.sala}" — esperando jugadores…`
+      this.message = `Room "${this.online.sala}" — waiting for players…`
       return [this, null]
     }
 
@@ -384,18 +381,18 @@ class App {
       // siempre: una partida local contra bots.
       if (!this.net) {
         if (item.id === 'create') return [this, this.startGame()]
-        this.message = 'No hay red disponible — jugá local.'
+        this.message = 'No network available — play local.'
         return [this, null]
       }
 
       const sala = this.flags.sala || 'general'
-      const nombre = this.flags.nombre || 'jugador'
+      const nombre = this.flags.nombre || 'player'
       this.online = { sala, anfitrion: item.id === 'create', peers: [], asientos: null }
       this.net({ t: 'join', sala, nombre, anfitrion: item.id === 'create' })
       this.message =
         item.id === 'create'
-          ? `Creando sala "${sala}" — buscando jugadores…`
-          : `Entrando a "${sala}" — buscando…`
+          ? `Creating room "${sala}" — looking for players…`
+          : `Joining "${sala}" — looking…`
       return [this, null]
     }
 
@@ -472,9 +469,10 @@ class App {
       return [this, this._act({ type: 'uno', seat: this.me }, game.legalActions(this.me))]
     }
 
-    // Naming a colour after a +4.
+    // Naming a colour after a +4. The keys are the English initials; the
+    // engine's own colour names stay as they are.
     if (game.phase === 'choose-color' && game.chooser === this.me) {
-      const colors = { r: 'rojo', a: 'amarillo', v: 'verde', z: 'azul' }
+      const colors = { r: 'rojo', y: 'amarillo', g: 'verde', b: 'azul' }
       for (const [chord, color] of Object.entries(colors)) {
         if (key.matches(msg, chord)) {
           return [
@@ -513,14 +511,14 @@ class App {
       const take = legal.find((a) => a.type === 'take')
       const draw = legal.find((a) => a.type === 'draw')
       if (take || draw) return [this, this._act(take || draw, legal)]
-      this.message = 'No podés robar ahora.'
+      this.message = "You can't draw right now."
       return [this, null]
     }
 
     if (key.matches(msg, 'p')) {
       const pass = legal.find((a) => a.type === 'pass')
       if (pass) return [this, this._act(pass, legal)]
-      this.message = 'Sólo podés pasar después de robar.'
+      this.message = 'You can only pass after drawing.'
       return [this, null]
     }
 
@@ -536,7 +534,7 @@ class App {
       (a) => a.type === 'play' && a.card.color === card.color && a.card.rank === card.rank
     )
     if (!allowed) {
-      this.message = 'Esa carta no va acá.'
+      this.message = "That card doesn't go here."
       return null
     }
     return this._act(action, legal)
@@ -553,7 +551,7 @@ class App {
           (action.card && a.card.color === action.card.color && a.card.rank === action.card.rank))
     )
     if (!allowed) {
-      this.message = 'Esa jugada no vale.'
+      this.message = "That move isn't allowed."
       return null
     }
 

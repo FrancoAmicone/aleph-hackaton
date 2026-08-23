@@ -66,11 +66,11 @@ function tooSmall(termWidth, termHeight) {
   const have = `${termWidth}×${termHeight}`
 
   const lines = [
-    style().bold(true).render('La ventana es muy chica'),
+    style().bold(true).render('The window is too small'),
     '',
-    style().render(`Necesito ${want} · tenés ${have}`),
+    style().render(`I need ${want} · you have ${have}`),
     '',
-    style().faint(true).render('Agrandá la terminal o achicá la tipografía')
+    style().faint(true).render('Make the terminal bigger or the font smaller')
   ]
 
   const width = Math.max(1, termWidth)

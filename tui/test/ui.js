@@ -141,7 +141,7 @@ test('a terminal too small for the canvas is asked to grow', (t) => {
   const model = app({ width: 80, height: 24 })
   const frame = stripAnsi(model.view())
 
-  t.ok(frame.includes('muy chica'), 'says the window is too small')
+  t.ok(frame.includes('too small'), 'says the window is too small')
   t.ok(frame.includes(`${CANVAS.width}×${CANVAS.height}`), 'names the size it needs')
 })
 
@@ -186,7 +186,7 @@ test('the canvas holds its size through a whole round', async (t) => {
     } else if (action.type === 'uno') {
       await step(model, press('u'))
     } else if (action.type === 'color') {
-      await step(model, press({ rojo: 'r', amarillo: 'a', verde: 'v', azul: 'z' }[action.color]))
+      await step(model, press({ rojo: 'r', amarillo: 'y', verde: 'g', azul: 'b' }[action.color]))
     } else {
       break
     }
@@ -255,9 +255,9 @@ test('a +4 asks for a colour, and the letter keys name it', (t) => {
 
   model.update(press('1'))
   t.is(model.game.phase, 'choose-color', 'it asks')
-  t.ok(stripAnsi(model.view()).includes('Elegí'), 'and says so on screen')
+  t.ok(stripAnsi(model.view()).includes('Pick'), 'and says so on screen')
 
-  model.update(press('v'))
+  model.update(press('g'))
   t.is(model.game.activeColor, 'verde', 'the named colour is in play')
   t.is(model.game.phase, 'play', 'and play resumes')
 })
@@ -297,8 +297,8 @@ test('resultado: gana el que gana, no siempre el asiento 0', (t) => {
   const desde = (me) => stripAnsi(renderResult(game, { ...view, me }))
 
   // El titular se dibuja con bloques, así que el texto legible es el veredicto.
-  t.ok(desde(1).includes('antes que nadie'), 'el que se quedó sin cartas ganó')
-  t.ok(desde(0).includes('gino se quedó sin cartas primero'), 'y el otro perdió')
+  t.ok(desde(1).includes('before anyone else'), 'el que se quedó sin cartas ganó')
+  t.ok(desde(0).includes('gino ran out of cards first'), 'y el otro perdió')
 })
 
 test('comandos: son los del jugador local, no los del asiento 0', (t) => {
@@ -315,19 +315,18 @@ test('comandos: son los del jugador local, no los del asiento 0', (t) => {
   game.phase = 'choose-color'
   game.chooser = 1
 
-  const etiquetas = (me) =>
-    commands(game, { ...view, me }).map(([, label]) => label)
+  const etiquetas = (me) => commands(game, { ...view, me }).map(([, label]) => label)
 
-  t.ok(etiquetas(1).includes('rojo'), 'el que elige ve los colores')
-  t.absent(etiquetas(0).includes('rojo'), 'el otro no los ve')
+  t.ok(etiquetas(1).includes('red'), 'el que elige ve los colores')
+  t.absent(etiquetas(0).includes('red'), 'el otro no los ve')
 
   // Y el cartel de arriba acompaña.
   t.ok(
-    stripAnsi(renderPrompt(game, { ...view, me: 1 })).includes('Elegí el color'),
+    stripAnsi(renderPrompt(game, { ...view, me: 1 })).includes('Pick the next colour'),
     'al que elige se le pide el color'
   )
   t.absent(
-    stripAnsi(renderPrompt(game, { ...view, me: 0 })).includes('Elegí el color'),
+    stripAnsi(renderPrompt(game, { ...view, me: 0 })).includes('Pick the next colour'),
     'al otro no'
   )
 })
@@ -448,8 +447,8 @@ test('comandos: one line, only what the rules allow, and it always fits', (t) =>
 
   t.is(plain.split('\n').length, 1, 'a single line')
   t.ok(style.width(line) <= CANVAS.width, `fits (${style.width(line)}/${CANVAS.width})`)
-  t.ok(plain.includes('robar'), 'drawing is offered')
-  t.ok(plain.includes('jugar') || plain.includes('tirar'), 'and playing')
+  t.ok(plain.includes('draw'), 'drawing is offered')
+  t.ok(plain.includes('play') || plain.includes('throw'), 'and playing')
 
   // Facing a stack, the draw key becomes "eat the stack".
   const owing = stacked({
@@ -457,7 +456,7 @@ test('comandos: one line, only what the rules allow, and it always fits', (t) =>
     hands: [[card('azul', 8)], [], [], []],
     pending: { count: 4, rank: '+2' }
   })
-  t.ok(stripAnsi(commandLine(owing, CANVAS.width)).includes('comer 4'), 'it says how many')
+  t.ok(stripAnsi(commandLine(owing, CANVAS.width)).includes('take 4'), 'it says how many')
 
   for (const phase of ['round-over', 'game-over']) {
     const over = stacked({ top: card('rojo', 7), hands: [[card('rojo', 3)], [], [], []] })
@@ -470,12 +469,12 @@ test('comandos: one line, only what the rules allow, and it always fits', (t) =>
 
 test('comandos: offers the colours only while one is being chosen', (t) => {
   const game = stacked({ top: card('rojo', 7), hands: [[card('rojo', 3)], [], [], []] })
-  t.absent(stripAnsi(commandLine(game, CANVAS.width)).includes('amarillo'), 'not while playing')
+  t.absent(stripAnsi(commandLine(game, CANVAS.width)).includes('yellow'), 'not while playing')
 
   game.phase = 'choose-color'
   game.chooser = 0
   const naming = stripAnsi(commandLine(game, CANVAS.width))
-  for (const color of ['rojo', 'amarillo', 'verde', 'azul']) {
+  for (const color of ['red', 'yellow', 'green', 'blue']) {
     t.ok(naming.includes(color), `${color} is offered`)
   }
   t.ok(commands(game).length >= 4, 'commands() is the shared source')
@@ -485,8 +484,9 @@ test('partida: reports only what the score line does not', (t) => {
   const game = stacked({ top: card('rojo', 7), hands: [[card('rojo', 3)], [], [], []] })
   const drawn = stripAnsi(partidaLines(game))
 
-  t.ok(/Turno\s+Vos/.test(drawn), 'whose turn it is')
-  t.ok(/Tu mano\s+1/.test(drawn), 'and how many cards you hold')
+  // The name comes from the engine's default roster, whatever it calls seat 0.
+  t.ok(new RegExp(`Turn\\s+${game.players[0].name}`).test(drawn), 'whose turn it is')
+  t.ok(/Your hand\s+1/.test(drawn), 'and how many cards you hold')
 })
 
 test('chat: tags the speaker without repeating their name', (t) => {
@@ -621,8 +621,8 @@ test('deal: cards land one at a time, in turn order, and play waits for the last
 
   // Nobody has anything yet; the UNO alarm must not fire on a half-dealt hand.
   let frame = stripAnsi(model.view())
-  t.absent(frame.includes('¡UNO!'), 'no false UNO during the deal')
-  t.ok(frame.includes('Reparte'), 'the prompt says who is dealing')
+  t.absent(frame.includes('UNO!'), 'no false UNO during the deal')
+  t.ok(frame.includes('deals…'), 'the prompt says who is dealing')
 
   // Keys do nothing until the last card lands.
   model.update(press('1'))
@@ -644,7 +644,7 @@ test('deal: cards land one at a time, in turn order, and play waits for the last
 
   // Everything is back to normal once the last card is down.
   frame = stripAnsi(model.view())
-  t.absent(frame.includes('Reparte'), 'the deal prompt is gone')
+  t.absent(frame.includes('deals…'), 'the deal prompt is gone')
   t.ok(frame.includes('['), 'and the commands are back')
 })
 
@@ -702,7 +702,7 @@ test('menu: two buttons, arrows switch, CREATE deals, JOIN says there is no room
   model.menuIndex = 1
   model.update(press('enter'))
   t.is(model.screen, 'menu', 'JOIN stays on the menu')
-  t.ok(model.message && model.message.includes('red'), 'and says there is no network available')
+  t.ok(model.message && model.message.includes('network'), 'and says there is no network available')
 
   // Con red, JOIN pide entrar a la sala en vez de rechazar.
   const enviados = []
@@ -760,7 +760,7 @@ test('menu: rules screen opens and closes', (t) => {
   t.is(model.screen, 'rules', 'rules opened')
 
   const frame = stripAnsi(model.view())
-  t.ok(frame.includes('REGLAS'), 'and it renders')
+  t.ok(frame.includes('RULES'), 'and it renders')
   t.ok(frame.includes('+4'), 'covering the cards this deck actually has')
 
   model.update(press('escape'))

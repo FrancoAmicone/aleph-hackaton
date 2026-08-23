@@ -124,11 +124,11 @@ function renderMenu(view) {
 
   const hint = view.message
     ? style().bold(true).foreground(226).render(view.message)
-    : style().foreground(244).render('←/→ elegir   ·   ↵ entrar   ·   R reglas   ·   Q salir')
+    : style().foreground(244).render('←/→ select   ·   ↵ enter   ·   R rules   ·   Q quit')
 
   const status = view.updateStatus
     ? style().foreground(view.updateStatus.color).render(view.updateStatus.text)
-    : style().foreground(WHITE).render(`v${view.version}  ·  corriendo sobre Pear + Bare`)
+    : style().foreground(WHITE).render(`v${view.version}  ·  running on Pear + Bare`)
 
   return fit(
     [
@@ -145,17 +145,16 @@ function renderMenu(view) {
 }
 
 const RULES = [
-  ['Objetivo', 'Quedarte sin cartas antes que los demás. La partida es a 500 puntos.'],
-  ['Las peras', 'Cada carta lleva su valor en peras: contás las peras y esa es la carta.'],
-  ['El mazo', '88 cartas en cuatro colores: 0-9 en peras, ocho +2 y cuatro +4.'],
-  ['Reparto', 'Cinco cartas a cada uno. Se da vuelta una para empezar el descarte.'],
-  ['Tu turno', 'Tirás una carta que coincida en color, o que tenga las mismas peras.'],
-  ['Si no podés', 'Robás una del mazo. Si esa sirve, la podés tirar en el acto.'],
-  ['+2', 'El siguiente roba dos y pierde el turno — salvo que responda con otro +2.'],
-  ['+4', 'Se puede tirar siempre. Elegís el color y el siguiente roba cuatro.'],
-  ['Apilar', 'Un +2 se responde con +2 y un +4 con +4: la cuenta se suma y sigue.'],
-  ['¡UNO!', 'Al quedarte con una carta cantá UNO. Si te pescan callado, robás dos.'],
-  ['Puntos', 'El que sale suma lo que quedó en las manos ajenas: número, +2 vale 20, +4 vale 50.']
+  ['Goal', 'Get rid of all your cards before anyone else. One hand decides the game.'],
+  ['The deck', '88 cards in four colours: 0-9, eight +2 and four +4.'],
+  ['The deal', 'Five cards each. One is turned over to start the discard pile.'],
+  ['Your turn', 'Play a card that matches the colour or the number on top.'],
+  ["If you can't", 'Draw one from the deck. If it fits, you may play it right away.'],
+  ['+2', 'The next player draws two and loses the turn — unless they answer with another +2.'],
+  ['+4', 'Always playable. You pick the colour and the next player draws four.'],
+  ['Stacking', 'A +2 is answered with a +2 and a +4 with a +4: the count adds up and moves on.'],
+  ['UNO!', 'Down to one card, shout UNO. If you get caught quiet, you draw two.'],
+  ['Points', 'The winner banks what was left in the other hands: face value, +2 is 20, +4 is 50.']
 ]
 
 function renderRules() {
@@ -183,8 +182,8 @@ function renderRules() {
     .borderForeground(MID)
     .render(rows.join('\n'))
 
-  const title = style().bold(true).foreground(SKY).render('REGLAS DEL TRUCO')
-  const footer = style().foreground(WHITE).render('ENTER o ESC para volver')
+  const title = style().bold(true).foreground(SKY).render('RULES')
+  const footer = style().foreground(WHITE).render('ENTER or ESC to go back')
 
   return ['', pad(title, width), '', pad(box, width), '', pad(footer, width)].join('\n')
 }
