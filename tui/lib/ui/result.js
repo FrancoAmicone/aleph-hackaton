@@ -26,6 +26,11 @@ const FONT = {
   E: ['█████', '█    ', '███  ', '█    ', '█████'],
   F: ['█████', '█    ', '███  ', '█    ', '█    '],
   Y: ['█   █', '█   █', ' ███ ', '  █  ', '  █  '],
+  U: ['█   █', '█   █', '█   █', '█   █', ' ███ '],
+  W: ['█   █', '█   █', '█ █ █', '█ █ █', ' █ █ '],
+  N: ['█   █', '██  █', '█ █ █', '█  ██', '█   █'],
+  L: ['█    ', '█    ', '█    ', '█    ', '█████'],
+  S: [' ████', '█    ', ' ███ ', '    █', '████ '],
   ' ': ['   ', '   ', '   ', '   ', '   ']
 }
 
@@ -65,7 +70,7 @@ function renderResult(game, view) {
 
   // Victory glows yellow-green like the pear; defeat sits in the blue chrome.
   const tone = won ? 226 : MID
-  const headline = bigText(won ? 'VICTORY' : 'DEFEAT')
+  const headline = bigText(won ? 'YOU WIN' : 'YOU LOSE')
     .map((r) => style().bold(true).foreground(tone).render(r))
     .join('\n')
 
@@ -94,7 +99,12 @@ function renderResult(game, view) {
 
   // Centred vertically: whatever the canvas has to spare goes half above
   // and half below the content.
+  // Eyebrow over the headline: the same two words whichever way it went.
+  const eyebrow = style().foreground(WHITE).render('G A M E   O V E R')
+
   const lines = [
+    pad(eyebrow, width),
+    '',
     pad(headline, width),
     '',
     pad(verdict, width),
