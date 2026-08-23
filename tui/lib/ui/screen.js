@@ -25,6 +25,29 @@ function stack(...blocks) {
   return blocks.filter((b) => b !== null && b !== undefined).join('\n')
 }
 
+// During the deal the cards are handed out one at a time round the table, so a
+// seat shows only what has reached it so far. `view.dealt` is how many cards
+// have been dealt in total; undefined once the deal is over.
+function dealtTo(game, seat, view) {
+  const hand = game.hands[seat].length
+  if (view.dealt === undefined) return hand
+  const round = game.playerCount
+  const full = Math.floor(view.dealt / round)
+  const extra = view.dealt % round
+  // Cards go out starting left of the dealer, the same order the turn moves.
+  const order = (seat - game.nextSeat(game.dealer) + round) % round
+  return Math.min(hand, full + (order < extra ? 1 : 0))
+}
+
+// The card that is in the air right now, if one is: which seat it is flying
+// to, and how far along the way it has got (0..1).
+function inFlight(game, view) {
+  if (view.dealt === undefined || view.flight === undefined) return null
+  const round = game.playerCount
+  const seat = (game.nextSeat(game.dealer) + (view.dealt % round)) % round
+  return { seat, t: view.flight }
+}
+
 // A titled box of an exact size, so the columns line up whatever is inside.
 function panel(title, body, width, height, opts = {}) {
   const inner = width - 2
@@ -50,8 +73,8 @@ function panel(title, body, width, height, opts = {}) {
 // A seat as one line: who they are, how many cards they hold, what they said.
 function seatLine(game, seat, view) {
   const player = game.players[seat]
-  const onTurn = game.currentActor() === seat
-  const count = game.hands[seat].length
+  const onTurn = view.dealt === undefined && game.currentActor() === seat
+  const count = dealtTo(game, seat, view)
 
   const name = onTurn
     ? style().bold(true).foreground(SKY).render(`▶ ${player.name}`)
@@ -59,8 +82,12 @@ function seatLine(game, seat, view) {
         .foreground(count === 1 ? LIGHT : WHITE)
         .render(player.name)
 
-  // One card left is the thing everyone at the table is watching for.
-  const alarm = count === 1 ? style().bold(true).foreground(SKY).render(' ¡UNO!') : ''
+  // One card left is the thing everyone at the table is watching for — but not
+  // while the deal is still handing cards out.
+  const alarm =
+    count === 1 && view.dealt === undefined
+      ? style().bold(true).foreground(SKY).render(' ¡UNO!')
+      : ''
   const said = view.says && view.says[seat]
   const bubble = said ? '  ' + style().italic(true).foreground(SKY).render(`«${said}»`) : ''
 
@@ -69,8 +96,8 @@ function seatLine(game, seat, view) {
 
 function flankLine(game, seat, view, align) {
   const player = game.players[seat]
-  const onTurn = game.currentActor() === seat
-  const count = game.hands[seat].length
+  const onTurn = view.dealt === undefined && game.currentActor() === seat
+  const count = dealtTo(game, seat, view)
 
   const name = onTurn
     ? style().bold(true).foreground(SKY).render(player.name)
@@ -79,7 +106,9 @@ function flankLine(game, seat, view, align) {
         .render(player.name)
 
   const rows = [name, cards.backsInline(count)]
-  if (count === 1) rows.push(style().bold(true).foreground(SKY).render('¡UNO!'))
+  if (count === 1 && view.dealt === undefined) {
+    rows.push(style().bold(true).foreground(SKY).render('¡UNO!'))
+  }
   const said = view.says && view.says[seat]
   if (said) rows.push(style().italic(true).foreground(SKY).render(`«${said}»`))
 
@@ -91,7 +120,7 @@ function flankLine(game, seat, view, align) {
 // The middle of the table: the draw pile, the discard pile, and the colour in
 // play — which after a +4 is not the colour of the card showing, so it gets a
 // swatch of its own rather than being left to inference.
-function feltBlock(game) {
+function feltBlock(game, view) {
   const inner = FELT - 2
   const W = 14
 
@@ -103,25 +132,61 @@ function feltBlock(game) {
     return lines.slice(0, 4).join('\n')
   }
 
-  const mazo = column(`MAZO ${game.draw.length}`, cards.smallBack())
-  const descarte = column('DESCARTE', cards.small(game.top))
+  // While dealing, the pile is visibly still giving cards away.
+  const left =
+    view.dealt === undefined
+      ? game.draw.length
+      : game.draw.length + (game.playerCount * 5 - view.dealt)
+  const mazo = column(`MAZO ${left}`, cards.smallBack())
+  const descarte = column(
+    'DESCARTE',
+    view.dealt === undefined ? cards.small(game.top) : cards.smallEmpty()
+  )
   const color = column(
     'COLOR',
-    stack(
-      cards.colorChip(game.activeColor),
-      style()
-        .foreground(game.activeColor ? CARD_COLORS[game.activeColor] : WHITE)
-        .render(game.activeColor || '—')
-    )
+    view.dealt === undefined
+      ? stack(
+          cards.colorChip(game.activeColor),
+          style()
+            .foreground(game.activeColor ? CARD_COLORS[game.activeColor] : WHITE)
+            .render(game.activeColor || '—')
+        )
+      : cards.colorChip(null)
   )
 
   const middle = style.joinHorizontal(style.position.top, mazo, descarte, color)
 
   const rows = ['╭' + '─'.repeat(inner) + '╮']
   for (const line of middle.split('\n')) rows.push(pad(line, inner))
-  rows.push(pad(stackLine(game), inner))
+  rows.push(pad(view.dealt === undefined ? stackLine(game) : dealLine(game, view), inner))
   rows.push('╰' + '─'.repeat(inner) + '╯')
   return rows.join('\n')
+}
+
+// The bottom line of the felt during the deal: a card sliding from the pile
+// towards whoever it is for, with the pile on the left and the seat's name on
+// the right.
+function dealLine(game, view) {
+  const flight = inFlight(game, view)
+  if (!flight) return style().faint(true).render('repartiendo…')
+
+  const name = game.players[flight.seat].name
+  const track = 22
+  const at = Math.round(flight.t * (track - 1))
+
+  let lane = ''
+  for (let i = 0; i < track; i++) lane += i === at ? '▚' : '·'
+
+  return (
+    style().faint(true).render('mazo ') +
+    style().foreground(MID).render(lane.slice(0, at)) +
+    style().bold(true).foreground(SKY).render('▚') +
+    style()
+      .faint(true)
+      .render(lane.slice(at + 1)) +
+    style().faint(true).render(' ▶ ') +
+    style().bold(true).foreground(SKY).render(name)
+  )
 }
 
 // A live +2/+4 stack is the most urgent thing on the table.
@@ -139,7 +204,7 @@ function renderMesa(game, view) {
     style.position.center,
     flankLine(game, 3, view, 'right'),
     ' ',
-    feltBlock(game),
+    feltBlock(game, view),
     ' ',
     flankLine(game, 1, view, 'left')
   )
@@ -212,10 +277,14 @@ function handWindow(total, selected) {
 }
 
 function handLines(game, view) {
-  const hand = game.hands[0]
-  const yours = game.currentActor() === 0 && game.phase === 'play'
+  // During the deal you see only what has reached you, face up as it lands.
+  const hand = game.hands[0].slice(0, dealtTo(game, 0, view))
+  const yours = view.dealt === undefined && game.currentActor() === 0 && game.phase === 'play'
 
-  if (hand.length === 0) return pad(style().faint(true).render('(sin cartas)'), CANVAS.width)
+  if (hand.length === 0) {
+    const text = view.dealt === undefined ? '(sin cartas)' : 'repartiendo…'
+    return pad(style().faint(true).render(text), CANVAS.width)
+  }
 
   const from = handWindow(hand.length, view.selected || 0)
   const shown = hand.slice(from, from + HAND_SLOTS)
@@ -325,7 +394,8 @@ function commands(game) {
 // before the ones that actually move the game on.
 const OPTIONAL = ['elegir', 'jugar']
 
-function commandLine(game, width) {
+function commandLine(game, width, view = {}) {
+  if (view.dealt !== undefined) return ''
   let rows = commands(game)
   if (rows.length === 0) return ''
 
@@ -352,6 +422,10 @@ function commandLine(game, width) {
 
 // The line that says what the game is waiting for.
 function renderPrompt(game, view) {
+  if (view.dealt !== undefined) {
+    return style().foreground(WHITE).render(`  Reparte ${game.players[game.dealer].name}…`)
+  }
+
   if (game.phase === 'game-over') {
     const won = game.winner() === 0
     return style()
@@ -426,7 +500,7 @@ function renderGame(game, view) {
     handLines(game, view)
   ).split('\n')
 
-  const foot = [renderPrompt(game, view), commandLine(game, width)]
+  const foot = [renderPrompt(game, view), commandLine(game, width, view)]
   const gap = Math.max(0, CANVAS.height - body.length - foot.length)
 
   return fit([...body, ...Array(gap).fill(''), ...foot].join('\n'))

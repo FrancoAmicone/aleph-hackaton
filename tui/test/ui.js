@@ -38,7 +38,7 @@ function app(opts = {}) {
     version: '1.0.0',
     flags: opts.flags || {},
     rng: opts.rng || seeded(2024),
-    think: { canto: 0, play: 0, say: 0 }
+    think: { canto: 0, play: 0, say: 0, deal: 0 }
   })
   model.update({
     type: 'resize',
@@ -463,6 +463,66 @@ test('the canvas never reflows, whatever the terminal', (t) => {
   t.alike(trim(small.view()), trim(large.view()), 'same layout, only the padding changes')
 })
 
+test('deal: cards land one at a time, in turn order, and play waits for the last', async (t) => {
+  // A real deal, not the instant one the other tests use.
+  const model = new App({
+    version: '1.0.0',
+    flags: {},
+    rng: seeded(4242),
+    think: { canto: 0, play: 0, say: 0 }
+  })
+  model.update({ type: 'resize', width: CANVAS.width, height: CANVAS.height })
+  model.startGame()
+
+  t.ok(model.dealing, 'the deal is in progress')
+  t.is(model.dealing.total, 20, 'twenty cards for four players')
+  t.absent(model._maybeAI(), 'the AI is not handed the turn while cards are in the air')
+
+  // Nobody has anything yet; the UNO alarm must not fire on a half-dealt hand.
+  let frame = stripAnsi(model.view())
+  t.absent(frame.includes('¡UNO!'), 'no false UNO during the deal')
+  t.ok(frame.includes('Reparte'), 'the prompt says who is dealing')
+
+  // Keys do nothing until the last card lands.
+  model.update(press('1'))
+  t.is(model.game.hands[0].length, 5, 'a keystroke mid-deal is ignored')
+
+  // Drive the frames by hand and watch the cards arrive.
+  const seen = []
+  let guard = 0
+  while (model.dealing && guard++ < 200) {
+    model.update({ type: 'frame' })
+    seen.push(model.dealing ? model.dealing.landed : 20)
+  }
+  t.absent(model.dealing, 'the deal finished')
+  t.ok(guard < 200, `and did so in a bounded number of frames (${guard})`)
+  t.ok(
+    seen.every((n, i) => i === 0 || n >= seen[i - 1]),
+    'cards only ever land, never un-land'
+  )
+
+  // Everything is back to normal once the last card is down.
+  frame = stripAnsi(model.view())
+  t.absent(frame.includes('Reparte'), 'the deal prompt is gone')
+  t.ok(frame.includes('['), 'and the commands are back')
+})
+
+test('deal: a new round deals again, and escape abandons it cleanly', (t) => {
+  const model = new App({
+    version: '1.0.0',
+    flags: {},
+    rng: seeded(7),
+    think: { canto: 0, play: 0, say: 0 }
+  })
+  model.update({ type: 'resize', width: CANVAS.width, height: CANVAS.height })
+  model.startGame()
+  t.ok(model.dealing, 'first round deals')
+
+  model.update(press('escape'))
+  t.is(model.screen, 'menu', 'escape still works mid-deal')
+  t.is(model.dealing, null, 'and clears the deal rather than leaving it ticking')
+})
+
 test('animation: runs on the menu and while rivals think, not on your turn', (t) => {
   const model = app()
   t.ok(model._animating(), 'the menu bars animate')
@@ -546,7 +606,7 @@ test('program: draws the menu and quits cleanly on ctrl+c', async (t) => {
     version: '1.0.0',
     flags: {},
     rng: seeded(9),
-    think: { canto: 0, play: 0, say: 0 }
+    think: { canto: 0, play: 0, say: 0, deal: 0 }
   })
   const program = new Program(model, {
     input,
@@ -582,7 +642,7 @@ test('program: plays a card through the real key decoder', async (t) => {
     version: '1.0.0',
     flags: { jugar: true },
     rng: seeded(3),
-    think: { canto: 0, play: 0, say: 0 }
+    think: { canto: 0, play: 0, say: 0, deal: 0 }
   })
   const program = new Program(model, {
     input,

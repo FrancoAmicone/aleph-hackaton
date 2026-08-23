@@ -20,6 +20,11 @@ const CLEAR_SAY = 2600
 // keeps the redraw cost off the floor.
 const FRAME_MS = 80
 
+// The deal: each card takes this many frames to fly from the pile to its seat.
+// Twenty cards at three frames is five seconds, which is enough to read as a
+// deal and not so long it becomes a wait.
+const DEAL_FRAMES = 3
+
 class App {
   constructor(opts = {}) {
     this.version = opts.version || '0.0.0'
@@ -41,6 +46,9 @@ class App {
 
     this.game = null
     this.frame = 0
+    // While a deal is in progress: how many cards have landed, and how many
+    // frames the current one has been in the air. null between deals.
+    this.dealing = null
     this.selected = 0
     this.says = {}
     this.message = null
@@ -61,7 +69,8 @@ class App {
   _animating() {
     if (this.think.frame === 0) return false
     if (this.screen === 'menu') return true
-    return this.screen === 'game' && !!this.game && this.game.currentActor() !== 0
+    if (this.screen !== 'game' || !this.game) return false
+    return this.dealing !== null || this.game.currentActor() !== 0
   }
 
   _animate() {
@@ -80,13 +89,41 @@ class App {
     this.selected = 0
     this.says = {}
     this.message = null
-    return this._maybeAI()
+    return this._startDeal()
+  }
+
+  // Kick off the deal animation. Tests set think.deal = 0 and get the cards
+  // instantly; the AI is not handed the turn until the last card lands.
+  _startDeal() {
+    if (this.think.deal === 0 || this.think.frame === 0) {
+      this.dealing = null
+      return this._maybeAI()
+    }
+    this.dealing = { landed: 0, age: 0, total: this.game.playerCount * 5 }
+    return this._animate()
+  }
+
+  // One frame of the deal. Returns true when the last card has landed.
+  _advanceDeal() {
+    const deal = this.dealing
+    if (!deal) return true
+    deal.age++
+    if (deal.age >= DEAL_FRAMES) {
+      deal.age = 0
+      deal.landed++
+    }
+    if (deal.landed >= deal.total) {
+      this.dealing = null
+      return true
+    }
+    return false
   }
 
   // Hand the turn to the AI if it is theirs, as a delayed Cmd.
   _maybeAI() {
     const game = this.game
     if (!game || game.phase === 'round-over' || game.phase === 'game-over') return null
+    if (this.dealing !== null) return null
 
     const seat = game.currentActor()
     if (seat === null || seat === 0) return null
@@ -127,10 +164,15 @@ class App {
         this.height = msg.height
         return [this, null]
 
-      case 'frame':
+      case 'frame': {
         if (!this._animating()) return [this, null]
         this.frame++
+        if (this.dealing !== null && this._advanceDeal()) {
+          // Last card down: the deal is over and play can begin.
+          return [this, [this._maybeAI(), this._animate()].filter(Boolean)]
+        }
         return [this, this._animate()]
+      }
 
       case 'ai':
         if (this.screen !== 'game') return [this, null]
@@ -244,8 +286,12 @@ class App {
 
     if (key.matches(msg, 'escape')) {
       this.screen = 'menu'
+      this.dealing = null
       return [this, this._animate()]
     }
+
+    // Nothing else does anything until the deal has landed.
+    if (this.dealing !== null) return [this, null]
 
     if (game.phase === 'game-over') {
       if (key.matches(msg, 'enter', 'space')) {
@@ -262,7 +308,7 @@ class App {
         this.says = {}
         this.selected = 0
         this.message = null
-        return [this, this._maybeAI()]
+        return [this, this._startDeal()]
       }
       return [this, null]
     }
@@ -378,7 +424,9 @@ class App {
               ...shared,
               selected: this.selected,
               says: this.says,
-              message: this.message
+              message: this.message,
+              dealt: this.dealing ? this.dealing.landed : undefined,
+              flight: this.dealing ? this.dealing.age / DEAL_FRAMES : undefined
             })
 
     return centre(canvas, this.width, this.height)
