@@ -7,7 +7,6 @@
 const { style } = require('../tea')
 const { CANVAS, pad, fit } = require('./canvas')
 const { MID, WHITE } = require('./palette')
-const { bars, SPEED } = require('./bars')
 
 const BUTTONS = [
   { id: 'menu', label: 'BACK TO MENU' },
@@ -25,6 +24,8 @@ const FONT = {
   A: [' ███ ', '█   █', '█████', '█   █', '█   █'],
   D: ['████ ', '█   █', '█   █', '█   █', '████ '],
   E: ['█████', '█    ', '███  ', '█    ', '█████'],
+  F: ['█████', '█    ', '███  ', '█    ', '█    '],
+  Y: ['█   █', '█   █', ' ███ ', '  █  ', '  █  '],
   ' ': ['   ', '   ', '   ', '   ', '   ']
 }
 
@@ -64,7 +65,7 @@ function renderResult(game, view) {
 
   // Victory glows yellow-green like the pear; defeat sits in the blue chrome.
   const tone = won ? 226 : MID
-  const headline = bigText(won ? 'VICTORIA' : 'DERROTA')
+  const headline = bigText(won ? 'VICTORY' : 'DEFEAT')
     .map((r) => style().bold(true).foreground(tone).render(r))
     .join('\n')
 
@@ -90,30 +91,27 @@ function renderResult(game, view) {
   )
 
   const hint = style().foreground(244).render('←/→ select   ·   ↵ enter')
-  const t = (view.frame || 0) * SPEED
 
-  return fit(
-    [
-      ...bars(width, 3, t),
-      '',
-      '',
-      pad(headline, width),
-      '',
-      pad(verdict, width),
-      '',
-      pad(style().faint(true).render('cards left in hand'), width),
-      pad(left, width),
-      '',
-      '',
-      '',
-      pad(row, width),
-      '',
-      pad(hint, width),
-      '',
-      '',
-      ...bars(width, 3, t + 41.7)
-    ].join('\n')
-  )
+  // Centred vertically: whatever the canvas has to spare goes half above
+  // and half below the content.
+  const lines = [
+    pad(headline, width),
+    '',
+    pad(verdict, width),
+    '',
+    pad(style().faint(true).render('cards left in hand'), width),
+    pad(left, width),
+    '',
+    '',
+    '',
+    pad(row, width),
+    '',
+    pad(hint, width)
+  ]
+  // Count rows, not entries: the headline and the buttons are several rows each.
+  const body = lines.join('\n')
+  const spare = Math.max(0, CANVAS.height - body.split('\n').length)
+  return fit('\n'.repeat(Math.floor(spare / 2)) + body)
 }
 
 module.exports = { renderResult, BUTTONS, bigText }
