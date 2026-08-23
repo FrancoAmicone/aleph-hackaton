@@ -10,7 +10,7 @@ const { fromSeed } = require('../rng')
 const ai = require('../uno/ai')
 const { renderGame } = require('./screen')
 const { renderMenu, renderRules, MENU_ITEMS } = require('./menu')
-const { renderResult, BUTTONS } = require('./result')
+const { renderResult, BUTTONS, FRAMES: SHOW_FRAMES, SHOW_MS } = require('./result')
 const { renderBoot, BOOT_FRAMES } = require('./boot')
 const { fit, centre, tooSmall, tooSmallFor } = require('./canvas')
 
@@ -45,6 +45,8 @@ class App {
 
     this.screen = 'menu' // menu | rules | game | result
     this.resultIndex = 0
+    // The frame the result screen came up on, so it knows how old it is.
+    this.resultAt = 0
     this.width = 80
     this.height = 24
 
@@ -95,7 +97,16 @@ class App {
   }
 
   _animate() {
-    return this._animating() ? tick(FRAME_MS, () => ({ type: 'frame' })) : null
+    if (!this._animating()) return null
+    // The fireworks run on a faster clock than the rest of the UI.
+    return tick(this._showing() ? SHOW_MS : FRAME_MS, () => ({ type: 'frame' }))
+  }
+
+  // True while the win's fireworks are still going on the result screen.
+  _showing() {
+    if (this.screen !== 'result' || !this.game || this.game.winner() !== this.me) return false
+    const age = this._resultAge()
+    return age !== undefined && age < SHOW_FRAMES
   }
 
   // --- lifecycle -------------------------------------------------------
@@ -182,8 +193,7 @@ class App {
     game.apply(action)
     this.selected = Math.min(this.selected, Math.max(0, game.hands[this.me].length - 1))
     if (game.isOver()) {
-      this.screen = 'result'
-      this.resultIndex = 0
+      this._showResult()
       return this._animate()
     }
 
@@ -191,6 +201,20 @@ class App {
     const clear = line ? tick(linger, () => ({ type: 'unsay', seat, tag: ++this._sayTag })) : null
     const next = this._maybeAI()
     return [clear, next].filter(Boolean)
+  }
+
+  // The result screen, fresh: first button focused, clock started for the
+  // fireworks a win opens with.
+  _showResult() {
+    this.screen = 'result'
+    this.resultIndex = 0
+    this.resultAt = this.frame
+  }
+
+  // Frames since the result came up. Undefined when nothing animates (tests),
+  // so the result is simply shown.
+  _resultAge() {
+    return this.think.frame === 0 ? undefined : this.frame - this.resultAt
   }
 
   // --- update ----------------------------------------------------------
@@ -307,8 +331,7 @@ class App {
         this.game.apply(e.action)
         this.selected = Math.min(this.selected, Math.max(0, this.game.hands[this.me].length - 1))
         if (this.game.isOver()) {
-          this.screen = 'result'
-          this.resultIndex = 0
+          this._showResult()
         }
         return [this, this._animate()]
       }
@@ -434,6 +457,11 @@ class App {
   }
 
   _resultKey(msg) {
+    // Any key during the fireworks skips them: the clock jumps to the end.
+    if (this._showing()) {
+      this.resultAt = this.frame - SHOW_FRAMES
+      return [this, null]
+    }
     if (key.matches(msg, 'left', 'right', 'h', 'l', 'up', 'down', 'k', 'j', 'tab')) {
       this.resultIndex = this.resultIndex === 0 ? 1 : 0
       return [this, null]
@@ -484,8 +512,7 @@ class App {
 
     if (game.phase === 'game-over') {
       // The result screen takes over; any key gets you there.
-      this.screen = 'result'
-      this.resultIndex = 0
+      this._showResult()
       return [this, this._animate()]
     }
 
@@ -588,8 +615,7 @@ class App {
     this.game.apply(action)
     this.selected = Math.min(this.selected, Math.max(0, this.game.hands[this.me].length - 1))
     if (this.game.isOver()) {
-      this.screen = 'result'
-      this.resultIndex = 0
+      this._showResult()
       return this._animate()
     }
     return this._maybeAI()
@@ -614,24 +640,28 @@ class App {
       this.screen === 'boot'
         ? renderBoot({ frame: this.bootFrame, version: this.version })
         : this.screen === 'menu'
-        ? renderMenu({
-            ...shared,
-            index: this.menuIndex,
-            settings: this.settings,
-            message: this.message
-          })
-        : this.screen === 'rules'
-          ? fit(renderRules())
-          : this.screen === 'result'
-            ? renderResult(this.game, { ...shared, index: this.resultIndex })
-            : renderGame(this.game, {
-                ...shared,
-                selected: this.selected,
-                says: this.says,
-                message: this.message,
-                dealt: this.dealing ? this.dealing.landed : undefined,
-                flight: this.dealing ? this.dealing.age / DEAL_FRAMES : undefined
-              })
+          ? renderMenu({
+              ...shared,
+              index: this.menuIndex,
+              settings: this.settings,
+              message: this.message
+            })
+          : this.screen === 'rules'
+            ? fit(renderRules())
+            : this.screen === 'result'
+              ? renderResult(this.game, {
+                  ...shared,
+                  index: this.resultIndex,
+                  age: this._resultAge()
+                })
+              : renderGame(this.game, {
+                  ...shared,
+                  selected: this.selected,
+                  says: this.says,
+                  message: this.message,
+                  dealt: this.dealing ? this.dealing.landed : undefined,
+                  flight: this.dealing ? this.dealing.age / DEAL_FRAMES : undefined
+                })
 
     return centre(canvas, this.width, this.height)
   }

@@ -7,6 +7,7 @@
 const { style } = require('../tea')
 const { CANVAS, pad, fit } = require('./canvas')
 const { WHITE } = require('./palette')
+const { fireworks, FRAMES, SHOW_MS } = require('./fireworks')
 
 // One tone per row of the 5-row headline.
 const WIN_RAMP = [226, 190, 154, 118, 82]
@@ -72,6 +73,10 @@ function renderResult(game, view) {
   const won = game.winner() === (view.me ?? 0)
   const winner = game.players[game.winner()]
 
+  // A win opens with fireworks; the result is revealed once they are done.
+  // `age` is frames since the screen came up; undefined means no animation.
+  if (won && view.age !== undefined && view.age < FRAMES) return fit(fireworks(view.age))
+
   // The headline carries all the colour: a row-by-row ramp, yellow down to
   // green for a win, orange down to red for a loss. Everything else is white.
   const ramp = won ? WIN_RAMP : LOSE_RAMP
@@ -128,4 +133,4 @@ function renderResult(game, view) {
   return fit('\n'.repeat(Math.floor(spare / 2)) + body)
 }
 
-module.exports = { renderResult, BUTTONS, bigText }
+module.exports = { renderResult, BUTTONS, bigText, FRAMES, SHOW_MS }
