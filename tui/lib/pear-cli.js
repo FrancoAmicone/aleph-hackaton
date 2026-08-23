@@ -96,10 +96,28 @@ function createPearCli(pkg, opts = {}) {
   log(`${appName} v${pkg.version}`)
   log(`Updates: ${updates === false ? 'disabled' : 'enabled'}`)
 
-  const runningAppPath =
-    !isDev && global.Bare && Array.isArray(Bare.argv) && typeof Bare.argv[0] === 'string'
-      ? path.resolve(Bare.argv[0])
-      : null
+  // La ruta del ejecutable que está corriendo. El updater la usa para saber
+  // QUÉ archivo reemplazar, así que si está mal el update falla entero.
+  //
+  // `path.resolve(Bare.argv[0])` no sirve: cuando el binario se invoca por
+  // nombre —que es lo normal, porque `pear install` lo deja en el PATH—
+  // argv[0] es sólo "the-great-pear", sin ruta, y resolve() lo pega contra el
+  // directorio actual. En Windows eso además pierde el ".exe".
+  //
+  // Síntoma real (Roman, Windows):
+  //   ✗ falló la actualización: ENOENT: no such file or directory,
+  //     rename "\\?\C:\Users\rroma\the-great-pear" -> ...
+  // Su home, y sin extensión: ese archivo no existe.
+  //
+  // `os.execPath()` devuelve la ruta real del ejecutable, sin importar cómo se
+  // haya invocado. argv[0] queda sólo como último recurso.
+  const execPath = typeof os.execPath === 'function' ? os.execPath() : null
+  const runningAppPath = isDev
+    ? null
+    : execPath ||
+      (Array.isArray(Bare.argv) && typeof Bare.argv[0] === 'string'
+        ? path.resolve(Bare.argv[0])
+        : null)
 
   // On macOS `pear install` lays the app down as a bundle, so the executable
   // runs from inside <name>.app/Contents/MacOS/. When that is how we were
