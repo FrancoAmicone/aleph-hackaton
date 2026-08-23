@@ -100,7 +100,7 @@ const BAND_ROWS = 2
 // The pear: this wide, this tall. Sized so the title, the pear and the buttons
 // all fit the 38-row canvas with room to breathe.
 const PEAR_W = 34
-const PEAR_H = 14
+const PEAR_H = 15
 
 // The pear turns this much per frame of the loop.
 const SPIN_PER_FRAME = 0.045
