@@ -7,7 +7,16 @@
 const { style } = require('../tea')
 const { CANVAS, pad, fit } = require('./canvas')
 const { WHITE } = require('./palette')
-const { fireworks, FRAMES, SHOW_MS } = require('./fireworks')
+const fireworks = require('./fireworks')
+const rain = require('./rain')
+
+// Both shows run on the same fast clock.
+const SHOW_MS = fireworks.SHOW_MS
+
+// How long the opening show is, for a win or a loss.
+function showFrames(won) {
+  return won ? fireworks.FRAMES : rain.FRAMES
+}
 
 // One tone per row of the 5-row headline.
 const WIN_RAMP = [226, 190, 154, 118, 82]
@@ -73,9 +82,12 @@ function renderResult(game, view) {
   const won = game.winner() === (view.me ?? 0)
   const winner = game.players[game.winner()]
 
-  // A win opens with fireworks; the result is revealed once they are done.
-  // `age` is frames since the screen came up; undefined means no animation.
-  if (won && view.age !== undefined && view.age < FRAMES) return fit(fireworks(view.age))
+  // A win opens with fireworks and a loss with rain; the result is revealed
+  // once the show is done. `age` is frames since the screen came up;
+  // undefined means no animation.
+  if (won && view.age !== undefined && view.age < fireworks.FRAMES) {
+    return fit(fireworks.fireworks(view.age))
+  }
 
   // The headline carries all the colour: a row-by-row ramp, yellow down to
   // green for a win, orange down to red for a loss. Everything else is white.
@@ -130,7 +142,13 @@ function renderResult(game, view) {
   // Count rows, not entries: the headline and the buttons are several rows each.
   const body = lines.join('\n')
   const spare = Math.max(0, CANVAS.height - body.split('\n').length)
-  return fit('\n'.repeat(Math.floor(spare / 2)) + body)
+  const final = fit('\n'.repeat(Math.floor(spare / 2)) + body)
+
+  // The rain falls over the finished result and lets it through as it eases.
+  if (!won && view.age !== undefined && view.age < rain.FRAMES) {
+    return rain.rain(view.age, final)
+  }
+  return final
 }
 
-module.exports = { renderResult, BUTTONS, bigText, FRAMES, SHOW_MS }
+module.exports = { renderResult, BUTTONS, bigText, showFrames, SHOW_MS }

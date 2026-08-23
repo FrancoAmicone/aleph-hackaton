@@ -10,7 +10,7 @@ const { fromSeed } = require('../rng')
 const ai = require('../uno/ai')
 const { renderGame } = require('./screen')
 const { renderMenu, renderRules, MENU_ITEMS } = require('./menu')
-const { renderResult, BUTTONS, FRAMES: SHOW_FRAMES, SHOW_MS } = require('./result')
+const { renderResult, BUTTONS, showFrames, SHOW_MS } = require('./result')
 const { renderBoot, BOOT_FRAMES } = require('./boot')
 const { fit, centre, tooSmall, tooSmallFor } = require('./canvas')
 
@@ -102,11 +102,12 @@ class App {
     return tick(this._showing() ? SHOW_MS : FRAME_MS, () => ({ type: 'frame' }))
   }
 
-  // True while the win's fireworks are still going on the result screen.
+  // True while the result screen's opening show — fireworks for a win, rain
+  // for a loss — is still going.
   _showing() {
-    if (this.screen !== 'result' || !this.game || this.game.winner() !== this.me) return false
+    if (this.screen !== 'result' || !this.game) return false
     const age = this._resultAge()
-    return age !== undefined && age < SHOW_FRAMES
+    return age !== undefined && age < showFrames(this.game.winner() === this.me)
   }
 
   // --- lifecycle -------------------------------------------------------
@@ -459,7 +460,7 @@ class App {
   _resultKey(msg) {
     // Any key during the fireworks skips them: the clock jumps to the end.
     if (this._showing()) {
-      this.resultAt = this.frame - SHOW_FRAMES
+      this.resultAt = this.frame - showFrames(this.game.winner() === this.me)
       return [this, null]
     }
     if (key.matches(msg, 'left', 'right', 'h', 'l', 'up', 'down', 'k', 'j', 'tab')) {

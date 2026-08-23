@@ -302,7 +302,9 @@ test('resultado: gana el que gana, no siempre el asiento 0', (t) => {
 })
 
 test('resultado: a win opens with fireworks, then reveals; a key skips them', (t) => {
-  const { FRAMES } = require('../lib/ui/result')
+  const { showFrames } = require('../lib/ui/result')
+  const FRAMES = showFrames(true)
+  const RAIN = showFrames(false)
   const roster = [
     { name: 'franco', isAI: false, level: 'normal' },
     { name: 'gino', isAI: false, level: 'normal' }
@@ -325,7 +327,17 @@ test('resultado: a win opens with fireworks, then reveals; a key skips them', (t
   t.not(stripAnsi(at(5, 1)), stripAnsi(at(12, 1)), 'and it moves')
   t.ok(stripAnsi(at(FRAMES, 1)).includes('before anyone else'), 'revealed when the show ends')
   t.ok(stripAnsi(at(undefined, 1)).includes('before anyone else'), 'no age, no show')
-  t.ok(stripAnsi(at(0, 0)).includes('ran out of cards first'), 'the loser gets no fireworks')
+
+  // The loser gets rain instead: same rules, the result shows through at the end.
+  for (const age of [0, 10, 30, RAIN - 1]) {
+    const frame = at(age, 0)
+    t.is(lines(frame).length, CANVAS.height, `rain ${age}: canvas rows`)
+    t.is(widest(frame), CANVAS.width, `rain ${age}: canvas columns`)
+  }
+  t.absent(stripAnsi(at(0, 0)).includes('ran out of cards first'), 'rain: not revealed at first')
+  t.ok(stripAnsi(at(10, 0)).trim().length > 0, 'rain: it is raining')
+  t.ok(stripAnsi(at(RAIN, 0)).includes('ran out of cards first'), 'rain: revealed when it stops')
+  t.is(at(RAIN, 0), at(undefined, 0), 'rain: and the last frame is the plain result')
 
   // Through the app: the clock starts on arrival and a key jumps it forward.
   const model = app({ think: { canto: 0, play: 0, deal: 0, say: 0 } })
