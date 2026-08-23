@@ -480,3 +480,101 @@ el corestore reutiliza bloques y el tamaño queda plano aunque la descarga esté
 Estuve 5 minutos viendo 135MB fijos mientras el update se aplicaba igual.
 
 **La única señal confiable es `--version`.**
+
+---
+
+## El bug que hizo que el multijugador nunca arrancara (v2.0.7)
+
+**Síntoma:** en `red.log` sale el `>> join` y **no vuelve absolutamente nada**.
+Ni siquiera `{"t":"estado","estado":"buscando"}`, que `room.join()` emite de forma
+sincrónica antes de tocar la red.
+
+**Diagnóstico:** si no vuelve ni el evento sincrónico, el problema NO es P2P.
+La capa de red nunca se instanció.
+
+**Causa:** `PearRuntime.run('./workers/main.js')` → `bare-sidecar`:
+
+```js
+this._process = spawn(bare, [entry, ...args], ...)
+```
+
+Spawnea **otro proceso** y le pasa la ruta como argumento. Ese proceso la resuelve
+contra su **cwd**. En un binario standalone no existe ningún `workers/main.js` en
+disco. Y `bare-pack` tampoco lo empaquetó: escanea `require`s **estáticos**, y
+`'./workers/main.js'` es un string que sólo existe en runtime.
+
+Andaba con `npm start` (el archivo está en disco) y **no** andaba instalado.
+
+**Cómo verificarlo sin correr nada** — buscar strings del worker en el binario:
+
+```bash
+strings -a out/darwin-arm64/the-great-pear | grep -c "the-great-pear:room:"
+# 0 = room.js NO está adentro     1 = sí está
+```
+
+**Por qué fue silencioso:** `run()` reenvía el stderr del worker como
+`{ type: 'worker' }`, y el reductor de `app.js` lo tira en su `default:`.
+El spawn fallaba y nadie se enteraba.
+
+**Arreglo:** sacar el worker. `bin.js` hace `require('./lib/net/room')` — un require
+estático que bare-pack sí ve — y maneja la sala en el proceso principal.
+Desaparecen un proceso, un spawn y el framing del IPC.
+
+### Lección general
+
+**Cualquier archivo que se cargue por una ruta en runtime no entra al bundle.**
+Vale para workers, para plugins y para `require` dinámico. El único camino seguro
+es un `require` literal en el árbol de dependencias del entrypoint.
+
+Y siempre probar **el binario compilado**, no sólo `npm start`. Este bug era
+invisible desde el código fuente.
+
+## Dos bugs más que destapó el `--log`
+
+**1. El invitado se creía asiento 0 por un instante.** El anfitrión reparte asientos
+apenas se abre la conexión, antes de que llegue el `hello`; en esa primera lista el
+invitado no figura y `_emitSeats` caía al default `0`. Si un `start` se colara en esa
+ventana, dos jugadores jugarían el mismo asiento y la partida divergiría.
+Arreglado: si mi clave no está en la lista y no soy el anfitrión, no emito nada.
+
+**2. ENTER mientras esperabas reiniciaba el discovery.** Sin asientos todavía, ENTER
+caía en la rama de join y **destruía el swarm para crear otro**. Como el discovery
+tarda 6-15s y falla ~30% al primer intento, el que se impacientaba se saboteaba solo.
+Arreglado: con sala abierta, ENTER sin asientos sólo muestra "esperando jugadores…".
+
+## Cómo se lee `red.log`
+
+```
+>> lo que la UI le pide a la red
+<< lo que la red le devuelve a la UI
+++ el updater
+!! un error
+```
+
+| Última línea | Dónde está el problema |
+|---|---|
+| sólo el encabezado | no se apretó CREATE/JOIN todavía |
+| `>> join` y nada más | **la capa de red no existe** (el bug de arriba) |
+| `buscando` y nada más | el swarm no levanta |
+| `anunciado`, nunca `peers` | discovery: no se encuentran en el DHT |
+| `peers` pero nunca `seats` | conectaron, el `hello` no cruza |
+| `seats` y no `start` | falta que el anfitrión apriete ENTER |
+
+Comparar el `topic` de los dos peers: si difiere, escribieron distinto el `--sala`.
+
+## Manejar la TUI sin manos (para verificar sin coordinar gente)
+
+`script` no sirve: no acepta un fifo como stdin y no entrega las teclas.
+Hace falta un pty de verdad — `scripts/drive-tui.py` lo hace con `pty.fork()`.
+
+```bash
+python3 scripts/drive-tui.py 70 "6:CR,50:CR" ./out/darwin-arm64/the-great-pear \
+  --no-updates --sala prueba --nombre anfitrion --log /tmp/p1.log
+```
+
+**Ojo con el arranque en frío:** un binario recién compilado tarda ~30s en arrancar
+la primera vez (macOS verifica la firma de 143MB). Los tiempos del driver se
+descalabran; correrlo dos veces y usar la segunda.
+
+**Y esto no prueba P2P.** Dos procesos en la misma máquina toman un atajo por LAN y
+nunca ejercitan el hole punching. Sirve para verificar el cableado, no la red.

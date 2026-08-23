@@ -235,6 +235,14 @@ function createPearCli(pkg, opts = {}) {
   async function teardown(code = 0) {
     if (tearingDown) return
     tearingDown = true
+
+    // Cleanup del consumidor (cerrar la sala, por ejemplo) antes de bajar el
+    // runtime. Un swarm que no se destruye deja registros colgados en el
+    // HyperDHT y degrada las conexiones siguientes.
+    try {
+      if (typeof opts.onTeardown === 'function') await opts.onTeardown()
+    } catch {}
+
     for (const worker of workers) {
       try {
         worker.destroy()

@@ -367,6 +367,16 @@ class App {
       return [this, null]
     }
 
+    // Ya estamos en una sala, esperando gente. ENTER acá NO puede volver a
+    // joinear: eso destruye el swarm y reinicia el discovery desde cero, o sea
+    // que el que se impacienta y aprieta ENTER se sabotea solo. Medido: el
+    // discovery tarda 6-15s y falla ~30% al primer intento, así que esta
+    // ventana de espera es justo cuando la gente aprieta teclas.
+    if (key.matches(msg, 'enter', 'space') && this.online) {
+      this.message = `Sala "${this.online.sala}" — esperando jugadores…`
+      return [this, null]
+    }
+
     if (key.matches(msg, 'enter', 'space')) {
       const item = MENU_ITEMS[this.menuIndex]
 

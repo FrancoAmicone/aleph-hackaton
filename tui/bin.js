@@ -5,9 +5,7 @@
 // plays Truco. Updater progress is pushed into the model as Msgs so the alt
 // screen is never corrupted by a stray console.log mid-hand.
 const createPearCli = require('./lib/pear-cli')
-const FramedStream = require('framed-stream')
 const fs = require('bare-fs')
-const b4a = require('b4a')
 const App = require('./lib/ui/app')
 const pkg = require('./package.json')
 
@@ -68,18 +66,30 @@ const cli = createPearCli(pkg, {
     },
 
     onError: (err) => status(`✗ ${err.message || err}`, 'brightred')
+  },
+
+  // Cerrar la sala antes de bajar el runtime: un swarm que queda vivo deja
+  // registros colgados en el DHT y degrada las conexiones siguientes.
+  onTeardown: async () => {
+    if (room) await room.destroy()
   }
 })
 
-// El worker de red: dueño del Hyperswarm del juego. La TUI no toca sockets.
+// La red del juego, en este mismo proceso.
 //
-// onData vacío a propósito: por defecto `run` reenvía cada chunk crudo al
-// modelo como { type: 'worker' }, y acá lo que queremos son mensajes enteros.
-// FramedStream sobre el mismo stream se encarga de rearmarlos.
-const worker = cli.run('./workers/main.js', { onData: () => {} })
-const net = new FramedStream(worker)
+// Antes esto vivía en `workers/main.js`, spawneado con `PearRuntime.run()`.
+// Andaba desde el código fuente y NO andaba en el binario instalado, en
+// silencio: `bare-sidecar` hace `spawn(bare, [entry])` y ese proceso resuelve
+// la ruta contra el cwd, pero un standalone no tiene ningún `workers/main.js`
+// en disco. Y `bare-pack` tampoco lo empaquetaba, porque escanea `require`s
+// estáticos y `'./workers/main.js'` es un string que sólo existe en runtime.
+// Resultado: el `join` salía hacia un pipe muerto y la sala nunca se abría.
+//
+// Con un `require` normal bare-pack sí lo ve, y room.js viaja adentro del
+// binario. De paso desaparecen un proceso, un spawn y el framing del IPC.
+const { Room } = require('./lib/net/room')
 
-net.on('error', () => {})
+let room = null
 
 archivoLog = cli.flags.log || null
 
@@ -89,24 +99,42 @@ if (archivoLog) {
   } catch {}
 }
 
-net.on('data', (buf) => {
-  let evento
-  try {
-    evento = JSON.parse(buf.toString())
-  } catch {
-    return
-  }
+// Lo que sale de la sala hacia el modelo.
+const emitirRed = (evento) => {
   registrar('<<', JSON.stringify(evento))
   send({ type: 'net', evento })
-})
+}
 
-// Lo que el modelo le manda al worker: join, action, start, leave.
-const enviarRed = (msg) => {
+// Lo que el modelo le pide a la red: join, action, start, leave.
+const enviarRed = async (msg) => {
+  registrar('>>', JSON.stringify(msg))
   try {
-    registrar('>>', JSON.stringify(msg))
-    net.write(b4a.from(JSON.stringify(msg)))
-  } catch {
-    // el worker se está cerrando
+    switch (msg.t) {
+      case 'join':
+        if (room) await room.destroy()
+        room = new Room({ sala: msg.sala, nombre: msg.nombre, onEvent: emitirRed })
+        await room.join({ anfitrion: !!msg.anfitrion })
+        break
+
+      case 'action':
+        if (room) room.enviarAccion(msg.action)
+        break
+
+      case 'start':
+        if (room) room.enviarInicio()
+        break
+
+      case 'leave':
+        if (room) await room.destroy()
+        room = null
+        emitirRed({ t: 'estado', estado: 'fuera' })
+        break
+    }
+  } catch (err) {
+    // Que un fallo de red sea VISIBLE. La versión anterior se lo tragaba y
+    // parecía que el juego andaba: nos costó una prueba entera con Gino.
+    registrar('!!', err.stack || err.message)
+    emitirRed({ t: 'error', mensaje: err.message })
   }
 }
 

@@ -187,6 +187,15 @@ class Room {
   // no es siempre 0. Lo resolvemos acá, que es donde se conoce la clave propia.
   _emitSeats() {
     const mio = (this.asientos || []).find((a) => a.clave === this.yo)
+
+    // El anfitrión reparte apenas se abre la conexión, antes de que llegue el
+    // `hello` del otro: en esa primera lista el invitado todavía no figura.
+    // Emitirla igual haría que se creyera asiento 0 —el del anfitrión— hasta
+    // el reparto siguiente. Si un `start` cayera en esa ventana, dos jugadores
+    // jugarían el mismo asiento y la partida divergiría. Mejor no emitir nada:
+    // el reparto bueno llega milisegundos después.
+    if (!mio && !this.esAnfitrion) return
+
     this._emit({
       t: 'seats',
       semilla: this.semilla,
