@@ -499,9 +499,9 @@ test('chat: tags the speaker without repeating their name', (t) => {
   const drawn = stripAnsi(chatLines(game, 40, 6)).split('\n')
   t.is(drawn.length, 6, 'padded to the panel height')
 
-  const played = drawn.find((line) => line.includes('tira'))
-  t.ok(played.startsWith('[VOS]'), 'tagged with the speaker')
-  t.absent(/\[VOS\]\s+Vos/.test(played), 'and the name is not repeated')
+  const played = drawn.find((line) => line.includes('plays'))
+  t.ok(played.startsWith('[YOU]'), 'tagged with the speaker')
+  t.absent(/\[YOU\]\s+You/.test(played), 'and the name is not repeated')
 })
 
 test('palette: every colour is a 256-colour index, and reaches the cards', (t) => {

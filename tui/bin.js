@@ -37,16 +37,16 @@ const status = (text, color) => {
 
 const cli = createPearCli(pkg, {
   flags: [
-    ['--duelo', 'jugar mano a mano contra una sola IA'],
-    ['--nivel <nivel>', 'rivales: facil | normal | duro'],
-    ['--sin-flor', 'jugar sin flor'],
-    ['--jugar', 'saltear el menú y repartir de una'],
-    ['--sala <nombre>', 'sala de juego online (default: general)'],
-    ['--nombre <nombre>', 'tu nombre en la mesa'],
-    ['--log <archivo>', 'escribir el registro de red a un archivo (tail -f)']
+    ['--duelo', 'play one-on-one against a single bot'],
+    ['--nivel <nivel>', 'rivals: facil | normal | duro'],
+    ['--sin-flor', 'play without flor'],
+    ['--jugar', 'skip the menu and deal right away'],
+    ['--sala <nombre>', 'online room to play in (default: general)'],
+    ['--nombre <nombre>', 'your name at the table'],
+    ['--log <archivo>', 'write the network log to a file (tail -f)']
   ],
   handlers: {
-    onUpdating: () => status('⇣ bajando actualización…', 'brightyellow'),
+    onUpdating: () => status('⇣ downloading update…', 'brightyellow'),
 
     onUpdatingDelta: (delta) => {
       const blocks = delta && delta.blocks ? delta.blocks : null
@@ -56,12 +56,12 @@ const cli = createPearCli(pkg, {
     // Required: a new version is on disk. Apply it and tell the player — the
     // running hand is left alone, the new binary takes over on restart.
     onUpdate: async ({ updater }) => {
-      status('⇣ aplicando actualización…', 'brightyellow')
+      status('⇣ applying update…', 'brightyellow')
       try {
         await updater.applyUpdate()
-        status('✓ nueva versión lista — reiniciá para jugarla', 'brightgreen')
+        status('✓ new version ready — restart to play it', 'brightgreen')
       } catch (err) {
-        status(`✗ falló la actualización: ${err.message}`, 'brightred')
+        status(`✗ update failed: ${err.message}`, 'brightred')
       }
     },
 
@@ -95,7 +95,10 @@ archivoLog = cli.flags.log || null
 
 if (archivoLog) {
   try {
-    fs.writeFileSync(archivoLog, `=== ${pkg.name} v${pkg.version} — ${new Date().toISOString()} ===\n`)
+    fs.writeFileSync(
+      archivoLog,
+      `=== ${pkg.name} v${pkg.version} — ${new Date().toISOString()} ===\n`
+    )
   } catch {}
 }
 

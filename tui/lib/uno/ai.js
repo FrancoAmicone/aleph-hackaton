@@ -104,11 +104,11 @@ function bestColor(hand, rng) {
 
 // A little table talk.
 const CHATTER = {
-  '+2': ['¡Robá dos!', 'Tomá.', '¡Dos para vos!'],
-  '+4': ['¡Cuatro!', '¡Y cambio de color!', 'Che, cuatro.'],
-  uno: ['¡UNO!', '¡Me queda una!'],
-  take: ['Uf…', 'Bueno, las robo.'],
-  draw: ['No tengo…', 'A ver qué sale.']
+  '+2': ['Draw two!', 'Take that.', 'Two for you!'],
+  '+4': ['Four!', 'And a new colour!', 'Four, my friend.'],
+  uno: ['UNO!', 'One left!'],
+  take: ['Ugh…', 'Fine, I take them.'],
+  draw: ['Got nothing…', "Let's see what comes."]
 }
 
 function chatter(action, rng = Math.random) {

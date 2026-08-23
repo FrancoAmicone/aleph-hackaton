@@ -116,7 +116,7 @@ class Room {
     framed.on('error', () => {})
 
     framed.on('data', (buf) => this._onMessage(peer, buf))
-    conn.once('close', () => this._dropPeer(clave, 'cerró'))
+    conn.once('close', () => this._dropPeer(clave, 'left'))
 
     this._send(peer, { t: 'hello', nombre: this.nombre })
 
@@ -232,7 +232,7 @@ class Room {
     const ahora = Date.now()
     for (const [clave, peer] of this.peers) {
       if (ahora - peer.ultimoVisto > DEAD_MS) {
-        this._dropPeer(clave, 'se desconectó')
+        this._dropPeer(clave, 'disconnected')
         continue
       }
       this._send(peer, { t: 'ping' })

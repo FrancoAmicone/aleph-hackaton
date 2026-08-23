@@ -14,8 +14,7 @@ const { style } = require('../tea')
 const cards = require('./cards')
 const { SKY, LIGHT, BLUE, MID, STRONG, WHITE, CARD_COLORS } = require('./palette')
 
-// The engine names colours in Spanish; the screen speaks English.
-const COLOR_NAMES = { rojo: 'red', amarillo: 'yellow', verde: 'green', azul: 'blue' }
+const { COLOR_NAMES } = require('../uno/deck')
 const { CANVAS, pad, fit } = require('./canvas')
 
 // Frames of the spinner shown while the rivals are thinking.

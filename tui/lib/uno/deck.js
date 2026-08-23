@@ -63,13 +63,18 @@ function sameCard(a, b) {
   return !!a && !!b && a.color === b.color && a.rank === b.rank
 }
 
+// The colours are named in Spanish inside the engine and on the wire; this is
+// what they are called anywhere a person reads them.
+const COLOR_NAMES = { rojo: 'red', amarillo: 'yellow', verde: 'green', azul: 'blue' }
+
 function cardName(card) {
   if (card.rank === WILD_FOUR) return '+4'
-  return `${card.rank} ${card.color}`
+  return `${COLOR_NAMES[card.color] || card.color} ${card.rank}`
 }
 
 module.exports = {
   COLORS,
+  COLOR_NAMES,
   DRAW_TWO,
   WILD_FOUR,
   createDeck,

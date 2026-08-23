@@ -18,7 +18,8 @@ const {
   value,
   isWild,
   sameCard,
-  cardName
+  cardName,
+  COLOR_NAMES
 } = require('./deck')
 
 const HAND_SIZE = 5
@@ -105,12 +106,12 @@ class Game {
     this.unoWindow = null // { seat } while someone sits on one card uncalled
     this.lastRound = null
 
-    this._log('deal', null, `Reparte ${this.players[this.dealer].name}`)
+    this._log('deal', null, `${this.players[this.dealer].name} deals`)
 
     // A +2 turned up at the start applies to the first player.
     if (first.rank === DRAW_TWO) {
       this.pending = { count: 2, rank: DRAW_TWO }
-      this._log('turn', null, `Sale un ${cardName(first)}: le pega al primero`)
+      this._log('turn', null, `A ${cardName(first)} opens: it hits the first player`)
     }
   }
 
@@ -200,7 +201,7 @@ class Game {
     hand.splice(index, 1)
     this.discard.push(card)
     this.drawn = null
-    this._log('play', seat, `${this.players[seat].name} tira ${cardName(card)}`, { card })
+    this._log('play', seat, `${this.players[seat].name} plays ${cardName(card)}`, { card })
 
     if (!isWild(card)) this.activeColor = card.color
 
@@ -234,7 +235,7 @@ class Game {
     this.activeColor = color
     this.phase = 'play'
     this.chooser = null
-    this._log('canto', seat, `${this.players[seat].name} pide ${color}`)
+    this._log('canto', seat, `${this.players[seat].name} calls ${COLOR_NAMES[color] || color}`)
     this.turn = this.nextSeat(seat)
     return this
   }
@@ -246,7 +247,7 @@ class Game {
 
     this.hands[seat].push(card)
     this.drawn = card
-    this._log('draw', seat, `${this.players[seat].name} roba una carta`)
+    this._log('draw', seat, `${this.players[seat].name} draws a card`)
 
     // If it cannot be played the turn is over; no point making them pass.
     if (!matches(card, this.top, this.activeColor)) return this._pass(seat)
@@ -256,7 +257,7 @@ class Game {
   _pass(seat) {
     this._closeUnoWindow(seat)
     this.drawn = null
-    this._log('turn', seat, `${this.players[seat].name} pasa`)
+    this._log('turn', seat, `${this.players[seat].name} passes`)
     this.turn = this.nextSeat(seat)
     return this
   }
@@ -269,7 +270,7 @@ class Game {
       const card = this._takeFromPile()
       if (card) this.hands[seat].push(card)
     }
-    this._log('score', seat, `${this.players[seat].name} roba ${count} y pierde el turno`)
+    this._log('score', seat, `${this.players[seat].name} draws ${count} and loses the turn`)
     this.pending = null
     this.drawn = null
     this.turn = this.nextSeat(seat)
@@ -281,7 +282,7 @@ class Game {
     if (!window) return this
 
     if (window.seat === seat) {
-      this._log('canto', seat, `${this.players[seat].name}: ¡UNO!`)
+      this._log('canto', seat, `${this.players[seat].name}: UNO!`)
       this.unoWindow = null
       return this
     }
@@ -291,13 +292,13 @@ class Game {
     this._log(
       'canto',
       seat,
-      `${this.players[seat].name} pesca a ${this.players[caught].name} sin cantar UNO`
+      `${this.players[seat].name} catches ${this.players[caught].name} without calling UNO`
     )
     for (let i = 0; i < CATCH_PENALTY; i++) {
       const card = this._takeFromPile()
       if (card) this.hands[caught].push(card)
     }
-    this._log('score', caught, `${this.players[caught].name} roba ${CATCH_PENALTY}`)
+    this._log('score', caught, `${this.players[caught].name} draws ${CATCH_PENALTY}`)
     this.unoWindow = null
     return this
   }
@@ -315,7 +316,7 @@ class Game {
       const top = this.discard.pop()
       this.draw = shuffle(this.discard, this.rng)
       this.discard = [top]
-      this._log('turn', null, 'Se acabó el mazo: se rebaraja el descarte')
+      this._log('turn', null, 'The deck ran out: the discard pile is reshuffled')
     }
     return this.draw.shift() || null
   }
@@ -331,7 +332,7 @@ class Game {
         const card = this._takeFromPile()
         if (card) this.hands[victim].push(card)
       }
-      this._log('score', victim, `${this.players[victim].name} roba ${this.pending.count}`)
+      this._log('score', victim, `${this.players[victim].name} draws ${this.pending.count}`)
       this.pending = null
     }
 
@@ -344,12 +345,12 @@ class Game {
     this.scores[winner] += points
     this.unoWindow = null
     this.lastRound = { winner, points }
-    this._log('score', winner, `${this.players[winner].name} se va con ${points} puntos`)
+    this._log('score', winner, `${this.players[winner].name} goes out with ${points} points`)
 
     // Emptying your hand wins the game outright — the whole game is one hand.
     // Points are kept for the result screen, not to decide anything.
     this.phase = 'game-over'
-    this._log('over', winner, `¡${this.players[winner].name} gana la partida!`)
+    this._log('over', winner, `${this.players[winner].name} wins the game!`)
     return this
   }
 
@@ -361,7 +362,7 @@ class Game {
 
 function defaultPlayers() {
   return [
-    { name: 'Vos', isAI: false },
+    { name: 'You', isAI: false },
     { name: 'Rita', isAI: true },
     { name: 'Coco', isAI: true },
     { name: 'Nacho', isAI: true }
