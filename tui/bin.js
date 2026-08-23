@@ -1,8 +1,8 @@
-// GRAN TRUCO ARGENTINO — a Truco game for the terminal, delivered over Pear.
+// THE GREAT PEAR — a terminal UNO game, delivered and updated over Pear.
 //
 // This file is only the wiring: `lib/pear-cli.js` owns the pear-runtime, the
 // OTA updater and teardown, and `lib/ui/app.js` is the tea model that actually
-// plays Truco. Updater progress is pushed into the model as Msgs so the alt
+// plays UNO. Updater progress is pushed into the model as Msgs so the alt
 // screen is never corrupted by a stray console.log mid-hand.
 const createPearCli = require('./lib/pear-cli')
 const fs = require('bare-fs')
@@ -37,20 +37,18 @@ const status = (text, color) => {
 
 const cli = createPearCli(pkg, {
   flags: [
-    ['--duelo', 'play one-on-one against a single bot'],
-    ['--nivel <nivel>', 'rivals: facil | normal | duro'],
-    ['--sin-flor', 'play without flor'],
-    ['--jugar', 'skip the menu and deal right away'],
-    ['--sala <nombre>', 'online room to play in (default: general)'],
-    ['--nombre <nombre>', 'your name at the table'],
-    ['--log <archivo>', 'write the network log to a file (tail -f)']
+    ['--room <name>', 'online room to play in (default: general)'],
+    ['--name <name>', 'your name at the table'],
+    ['--level <level>', 'bot difficulty: easy | normal | hard'],
+    ['--play', 'skip the menu and deal right away'],
+    ['--log <file>', 'write the network log to a file (tail -f)']
   ],
   handlers: {
     onUpdating: () => status('⇣ downloading update…', 'brightyellow'),
 
     onUpdatingDelta: (delta) => {
       const blocks = delta && delta.blocks ? delta.blocks : null
-      status(blocks ? `⇣ actualizando (${blocks} bloques)…` : '⇣ actualizando…', 'brightyellow')
+      status(blocks ? `⇣ updating (${blocks} blocks)…` : '⇣ updating…', 'brightyellow')
     },
 
     // Required: a new version is on disk. Apply it and tell the player — the

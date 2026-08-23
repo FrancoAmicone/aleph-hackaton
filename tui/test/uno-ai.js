@@ -102,7 +102,7 @@ test('ai: names the colour it holds most of', (t) => {
 })
 
 test('ai: a hard rival always calls its own UNO', (t) => {
-  const game = aiGame(3, 'duro')
+  const game = aiGame(3, 'hard')
   game.hands = [[card('rojo', 3)], [], [], []]
   game.unoWindow = { seat: 0 }
   game.phase = 'play'
@@ -113,7 +113,7 @@ test('ai: a hard rival always calls its own UNO', (t) => {
 })
 
 test('ai: a hard rival catches somebody who forgot', (t) => {
-  const game = aiGame(4, 'duro')
+  const game = aiGame(4, 'hard')
   game.hands = [[card('rojo', 3)], [card('azul', 4), card('azul', 5)], [], []]
   game.discard = [card('rojo', 7)]
   game.activeColor = 'rojo'
@@ -133,7 +133,7 @@ test('fuzz: 200 four-handed games finish cleanly', (t) => {
   let steps = 0
 
   for (let seed = 1; seed <= 200; seed++) {
-    const game = aiGame(seed, ['facil', 'normal', 'duro'][seed % 3])
+    const game = aiGame(seed, ['easy', 'normal', 'hard'][seed % 3])
     const result = playOut(game, seeded(seed * 7919))
 
     if (result.deadlock) {

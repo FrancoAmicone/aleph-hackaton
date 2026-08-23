@@ -369,7 +369,7 @@ npm run lockstep:test -- invitado   misala -         52000   # terminal 2
 ### Cómo se juega online
 
 ```bash
-the-great-pear --sala mipartida --nombre franco
+the-great-pear --room mipartida --name franco
 ```
 
 En el menú:
@@ -377,7 +377,7 @@ En el menú:
 | Tecla | Qué hace |
 |---|---|
 | `CREATE ROOM` + ENTER | crea la sala y espera jugadores (sos el anfitrión) |
-| `JOIN ROOM` + ENTER | entra a la sala de `--sala` |
+| `JOIN ROOM` + ENTER | entra a la sala de `--room` |
 | ENTER (con jugadores) | **el anfitrión** arranca la partida |
 | `L` | partida **local** contra bots, sin red |
 
@@ -560,7 +560,7 @@ Arreglado: con sala abierta, ENTER sin asientos sólo muestra "esperando jugador
 | `peers` pero nunca `seats` | conectaron, el `hello` no cruza |
 | `seats` y no `start` | falta que el anfitrión apriete ENTER |
 
-Comparar el `topic` de los dos peers: si difiere, escribieron distinto el `--sala`.
+Comparar el `topic` de los dos peers: si difiere, escribieron distinto el `--room`.
 
 ## Manejar la TUI sin manos (para verificar sin coordinar gente)
 
@@ -569,7 +569,7 @@ Hace falta un pty de verdad — `scripts/drive-tui.py` lo hace con `pty.fork()`.
 
 ```bash
 python3 scripts/drive-tui.py 70 "6:CR,50:CR" ./out/darwin-arm64/the-great-pear \
-  --no-updates --sala prueba --nombre anfitrion --log /tmp/p1.log
+  --no-updates --room prueba --name anfitrion --log /tmp/p1.log
 ```
 
 **Ojo con el arranque en frío:** un binario recién compilado tarda ~30s en arrancar
@@ -631,7 +631,7 @@ Dos instancias apuntando al mismo `--log` se pisan: el archivo queda con dos
 encabezados y las líneas intercaladas, imposible de leer. Usar un nombre por corrida:
 
 ```bash
-the-great-pear --sala aleph --nombre franco --log ~/red-$(date +%H%M%S).log
+the-great-pear --room aleph --name franco --log ~/red-$(date +%H%M%S).log
 ```
 
 ---
