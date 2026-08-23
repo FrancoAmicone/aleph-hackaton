@@ -242,3 +242,75 @@ entrar a la TUI y leer el log en pantalla — inservible para scriptear y para v
 | Tests | ✅ 133/133 |
 | OTA sobre el juego | ⬜ |
 | **Multijugador P2P** | ⬜ **lo único que falta de verdad** |
+
+---
+
+## Capa de red (Fase 2) — ✅ verificada
+
+`tui/lib/net/room.js` + `tui/workers/main.js`. La red vive **en el worker de Bare**, nunca en
+el proceso de la TUI: así el descubrimiento y el hole punching no le roban frames al render.
+
+### Dos swarms, a propósito
+
+`lib/pear-cli.js` ya tiene su swarm y le hace `store.replicate(connection)` a **toda** conexión,
+porque el updater lo necesita. Meter tráfico de juego ahí haría que cada peer de la partida
+reciba el protocolo de Hypercore. Por eso `room.js` levanta un swarm aparte.
+
+### Protocolo
+
+**TUI ↔ worker** (por `Bare.IPC` + `FramedStream`):
+
+| Dirección | Mensaje |
+|---|---|
+| TUI → worker | `{ t: 'join', sala, nombre, anfitrion }` · `{ t: 'action', action }` · `{ t: 'leave' }` |
+| worker → TUI | `{ t: 'estado' }` · `{ t: 'peers' }` · `{ t: 'seats' }` · `{ t: 'action' }` · `{ t: 'peer-lost' }` |
+
+**Entre peers:** `hello` (nombre) · `seats` (semilla + asientos, sólo del anfitrión) ·
+`action` (la acción del engine tal cual) · `ping` (heartbeat).
+
+La configuración llega por IPC, no por argv: `createPearCli` spawnea con
+`PearRuntime.run(script)` **sin argumentos**. Además así se puede entrar y salir de salas sin
+respawnear el worker.
+
+### Sincronización: lockstep determinístico
+
+El anfitrión sortea una semilla y la reparte con los asientos. Todos construyen el mismo mazo.
+**Por la red viajan sólo las acciones**, que ya son JSON plano (`{ type, seat, card }`).
+No hay que serializar ni reconciliar estado.
+
+### Resultados medidos (3 peers)
+
+```
+[anfitriona +6.3s] peers = 1 ["segundo"]
+[anfitriona +8.2s] SEATS semilla=95248ca7… ["0:anfitriona","1:segundo","2:tercero"]
+[tercero    +4.2s] SEATS semilla=95248ca7… ["0:anfitriona","1:segundo","2:tercero"]
+[tercero   +16.0s] ACCION RECIBIDA {"type":"play","seat":0,...}
+```
+
+| Qué | Resultado |
+|---|---|
+| Conexión | 4-6 s |
+| Misma semilla en todos | ✅ `95248ca7…` |
+| Asientos consistentes | ✅ |
+| Broadcast de acciones | ✅ malla completa, sin relay |
+| **Caída abrupta (`kill -9`)** | ✅ detectada en **4-6 s** por el heartbeat |
+| Cierre limpio | ✅ detectado al instante |
+
+### Probar la red sin abrir el juego
+
+```bash
+cd tui
+npm run net:test -- anfitriona misala anfitrion 40000    # terminal 1
+npm run net:test -- invitado   misala -         37000    # terminal 2
+```
+
+Argumentos: `<nombre> <sala> [anfitrion] [duración-ms]`.
+Ejercita `lib/net/room.js` sin TUI ni worker — sirve para probar la red aislada.
+
+### Las dos cosas que no se tocan
+
+1. **`framed.on('error')` además de `conn.on('error')`.** El `ECONNRESET` se propaga por el
+   stream envolvente, no sólo por el `conn`. Sin los dos handlers, un jugador que cierra la
+   ventana le tumba el proceso al otro.
+2. **`clearInterval` en el teardown.** Los intervalos del refresh y del heartbeat mantienen vivo
+   el event loop de Bare: sin limpiarlos el worker no termina nunca.

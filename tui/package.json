@@ -19,13 +19,17 @@
     "make:linux-x64": "bare-build --name the-great-pear --standalone --host linux-x64 --out ./out/linux-x64 bin.js",
     "make:win32-arm64": "bare-build --name the-great-pear --standalone --host win32-arm64 --out ./out/win32-arm64 bin.js",
     "make:win32-x64": "bare-build --name the-great-pear --standalone --host win32-x64 --out ./out/win32-x64 bin.js",
-    "start:updates": "node node_modules/bare-runtime/bin/bare bin.js --updates"
+    "start:updates": "node node_modules/bare-runtime/bin/bare bin.js --updates",
+    "net:test": "node scripts/net-test.js"
   },
   "dependencies": {
+    "b4a": "^1.8.1",
     "bare-os": "^3.9.0",
     "bare-path": "^3.0.0",
     "bare-storage": "^1.1.0",
     "corestore": "^7.9.2",
+    "framed-stream": "^1.0.1",
+    "hypercore-crypto": "^3.7.0",
     "hyperswarm": "^4.17.0",
     "paparam": "^1.10.1",
     "pear-runtime": "1.1.1",
