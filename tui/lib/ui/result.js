@@ -57,7 +57,9 @@ function button(label, focus, inner) {
 
 function renderResult(game, view) {
   const width = CANVAS.width
-  const won = game.winner() === 0
+  // Ganar es que gane MI asiento. Online el ganador puede ser cualquiera, y con
+  // `0` fijo el invitado veía DERROTA al ganar y VICTORIA al perder.
+  const won = game.winner() === (view.me ?? 0)
   const winner = game.players[game.winner()]
 
   // Victory glows yellow-green like the pear; defeat sits in the blue chrome.

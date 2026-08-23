@@ -11,6 +11,7 @@ const {
   renderMesa,
   panel,
   commands,
+  renderPrompt,
   commandLine,
   partidaLines,
   chatLines
@@ -19,6 +20,7 @@ const { bars, block, GLYPHS } = require('../lib/ui/bars')
 const { CANVAS } = require('../lib/ui/canvas')
 const palette = require('../lib/ui/palette')
 const cardsUi = require('../lib/ui/cards')
+const { renderResult } = require('../lib/ui/result')
 const App = require('../lib/ui/app')
 
 function seeded(seed) {
@@ -279,6 +281,55 @@ test('panel: draws an exact rectangle whatever is inside it', (t) => {
       'and exactly the requested width'
     )
   }
+})
+
+test('resultado: gana el que gana, no siempre el asiento 0', (t) => {
+  const roster = [
+    { name: 'franco', isAI: false, level: 'normal' },
+    { name: 'gino', isAI: false, level: 'normal' }
+  ]
+  const game = new Game({ players: roster, rng: seeded(5) })
+  // Terminar la mano de verdad: `winner()` sale de lastRound, no de las manos.
+  game.phase = 'game-over'
+  game.lastRound = { winner: 1, points: 12 }
+  game.hands[1] = []
+
+  const desde = (me) => stripAnsi(renderResult(game, { ...view, me }))
+
+  // El titular se dibuja con bloques, así que el texto legible es el veredicto.
+  t.ok(desde(1).includes('antes que nadie'), 'el que se quedó sin cartas ganó')
+  t.ok(desde(0).includes('gino se quedó sin cartas primero'), 'y el otro perdió')
+})
+
+test('comandos: son los del jugador local, no los del asiento 0', (t) => {
+  // La línea de comandos hacía `game.legalActions(0)`. Online eso mostraba
+  // siempre lo que podía hacer el anfitrión: el que jugaba un comodín no veía
+  // R/A/V/Z y no tenía forma de elegir color, así que la partida se trababa en
+  // `choose-color`. Pasó en la primera mano real Franco-Gino, tras un +4.
+  const roster = [
+    { name: 'franco', isAI: false, level: 'normal' },
+    { name: 'gino', isAI: false, level: 'normal' }
+  ]
+  const game = new Game({ players: roster, rng: seeded(5) })
+
+  game.phase = 'choose-color'
+  game.chooser = 1
+
+  const etiquetas = (me) =>
+    commands(game, { ...view, me }).map(([, label]) => label)
+
+  t.ok(etiquetas(1).includes('rojo'), 'el que elige ve los colores')
+  t.absent(etiquetas(0).includes('rojo'), 'el otro no los ve')
+
+  // Y el cartel de arriba acompaña.
+  t.ok(
+    stripAnsi(renderPrompt(game, { ...view, me: 1 })).includes('Elegí el color'),
+    'al que elige se le pide el color'
+  )
+  t.absent(
+    stripAnsi(renderPrompt(game, { ...view, me: 0 })).includes('Elegí el color'),
+    'al otro no'
+  )
 })
 
 test('mesa: renders with 2 and 3 players, from every seat', (t) => {

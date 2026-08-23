@@ -390,7 +390,7 @@ function handLines(game, view) {
   // During the deal you see only what has reached you, face up as it lands.
   const me = view.me ?? 0
   const hand = game.hands[me].slice(0, dealtTo(game, me, view))
-  const yours = view.dealt === undefined && game.currentActor() === 0 && game.phase === 'play'
+  const yours = view.dealt === undefined && game.currentActor() === me && game.phase === 'play'
 
   if (hand.length === 0) {
     const text = view.dealt === undefined ? '(sin cartas)' : 'repartiendo…'
@@ -472,7 +472,10 @@ function commands(game, view = {}) {
     ]
   }
 
-  const actions = game.legalActions(0)
+  // Qué puede hacer EL JUGADOR LOCAL. Con `0` fijo, online todos veían los
+  // comandos del anfitrión: el que jugaba un comodín nunca veía R/A/V/Z y la
+  // partida se trababa en choose-color. Pasó en la primera mano Franco-Gino.
+  const actions = game.legalActions(view.me ?? 0)
   if (actions.length === 0) return []
 
   const has = (type) => actions.some((a) => a.type === type)
@@ -547,11 +550,11 @@ function renderPrompt(game, view) {
       .render(`  ${game.players[winner].name} se fue con ${points} puntos · ENTER para seguir`)
   }
 
-  if (game.phase === 'choose-color' && game.chooser === 0) {
+  if (game.phase === 'choose-color' && game.chooser === (view.me ?? 0)) {
     return style().bold(true).foreground(SKY).render('  Elegí el color que sigue')
   }
 
-  if (game.currentActor() !== 0) {
+  if (game.currentActor() !== (view.me ?? 0)) {
     const spin = SPINNER[Math.floor((view.frame || 0) / 2) % SPINNER.length]
     const name = game.players[game.currentActor()].name
     return (

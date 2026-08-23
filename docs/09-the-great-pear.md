@@ -633,3 +633,57 @@ encabezados y las líneas intercaladas, imposible de leer. Usar un nombre por co
 ```bash
 the-great-pear --sala aleph --nombre franco --log ~/red-$(date +%H%M%S).log
 ```
+
+---
+
+## Mano completa Franco ↔ Gino (23-ago 09:58) — y los 5 asientos hardcodeados
+
+**16 acciones cruzaron el cable**: `play`, `+2`, `take`, `draw`, `uno`. El lockstep
+aguantó toda la mano. La partida se trabó recién en el `+4`.
+
+```
+[+426.4s] << {"type":"play","seat":1,"card":{"color":null,"rank":"+4"}}
+[+507.4s] << {"t":"peer-lost","nombre":"gino","motivo":"cerró"}
+```
+
+Nunca llegó la acción `{type:'color'}` que sigue al comodín.
+
+### La causa: la vista preguntaba siempre por el asiento 0
+
+`_act()` sí manda la acción de color. El problema era que **la UI nunca se la ofrecía
+al jugador correcto**. Cinco lugares calculaban la vista para el asiento 0 en vez de
+para `view.me`:
+
+| Archivo:línea | Código viejo | Qué rompía |
+|---|---|---|
+| `screen.js:393` | `currentActor() === 0` | tu mano no se resaltaba en tu turno |
+| `screen.js:475` | `legalActions(0)` | **toda la línea de comandos** |
+| `screen.js:550` | `chooser === 0` | el cartel "Elegí el color" |
+| `screen.js:554` | `currentActor() !== 0` | el "está pensando…" |
+| `result.js:60` | `winner() === 0` | el invitado veía DERROTA al ganar |
+
+El que trabó la partida es `legalActions(0)`: Gino jugó el `+4`, entró en
+`choose-color`, y la línea de comandos le mostraba lo que podía hacer **Franco**.
+Nunca vio `R/A/V/Z`.
+
+Detalle cruel: el *handler de teclas* sí usaba `this.me` correctamente. Si Gino
+apretaba `R` a ciegas, funcionaba. La UI simplemente no se lo decía.
+
+### Por qué ningún test lo agarró
+
+El modo local es **1 humano + 3 bots, y el humano siempre es el asiento 0**.
+`view.me === 0` en todas las partidas de test, así que `0` y `view.me` eran
+indistinguibles. El bug sólo existe cuando `me !== 0`, y eso sólo pasa online.
+
+Tests nuevos, los tres verificados contra el código viejo:
+
+- `mesa: renders with 2 and 3 players, from every seat`
+- `comandos: son los del jugador local, no los del asiento 0`
+- `resultado: gana el que gana, no siempre el asiento 0`
+
+### La regla
+
+**Cualquier `0` literal en la vista es un bug de multijugador.** El asiento local es
+`view.me`; el `0` sólo funciona de casualidad porque el modo local lo hace cierto.
+Buscar `=== 0`, `!== 0` y `(0)` en todo lo que renderiza antes de dar por buena una
+pantalla nueva.
