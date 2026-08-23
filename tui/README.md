@@ -77,11 +77,11 @@ no port forwarding, no accounts: peers find each other on the
 name, and hole-punch a direct encrypted connection.
 
 ```sh
-the-great-pear --sala aleph --nombre franco      # then press CREATE ROOM
-the-great-pear --sala aleph --nombre gino        # then press JOIN ROOM
+the-great-pear --room aleph --name franco      # then press CREATE ROOM
+the-great-pear --room aleph --name gino        # then press JOIN ROOM
 ```
 
-Everyone must type **the same `--sala`**. The room name is hashed into the DHT
+Everyone must type **the same `--room`**. The room name is hashed into the DHT
 topic, so `aleph` and `Aleph` are different rooms and the peers never meet.
 
 **Give it up to 60 seconds.** Discovery takes 6–15s when it goes well and fails
@@ -116,7 +116,7 @@ see what is happening — the TUI owns the whole screen, so a `console.log` is
 either invisible or corrupts the render.
 
 ```sh
-the-great-pear --sala aleph --nombre franco --log ~/red.log
+the-great-pear --room aleph --name franco --log ~/red.log
 tail -F ~/red.log      # -F, not -f: the file is truncated at startup
 ```
 
@@ -155,18 +155,21 @@ legal moves, so it can never offer you something the rules do not allow.
 ### Flags
 
 ```sh
-the-great-pear --sala <name>          # the online room to join
-the-great-pear --nombre <name>        # your name at the table
+the-great-pear --room <name>          # the online room to join
+the-great-pear --name <name>          # your name at the table
 the-great-pear --log <file>           # write the network log, to follow with tail -F
-the-great-pear --duelo                # one-on-one against a single bot
-the-great-pear --nivel duro           # facil | normal | duro
-the-great-pear --jugar                # skip the menu and deal a local hand
+the-great-pear --level hard           # bot difficulty: easy | normal | hard
+the-great-pear --play                 # skip the menu and deal a local hand
 the-great-pear --no-updates           # disable OTA updates for this run
 the-great-pear --version              # print the version and exit
+the-great-pear --help                 # the flag list
 ```
 
-`--sala` and `--nombre` only carry values; **the menu button decides your role** —
+`--room` and `--name` only carry values; **the menu button decides your role** —
 CREATE ROOM makes you the host, JOIN ROOM makes you a guest.
+
+> `--play` deals a **local** hand against bots and never reaches the menu, so it
+> cannot be combined with `--room`.
 
 ## Running from source
 
