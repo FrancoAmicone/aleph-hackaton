@@ -381,6 +381,40 @@ test('palette: every colour is a 256-colour index, and reaches the cards', (t) =
   }
 })
 
+test('cards: every card is exactly the same rectangle', (t) => {
+  const { BIG, SMALL } = cardsUi
+  const every = []
+  for (const color of ['rojo', 'amarillo', 'verde', 'azul']) {
+    for (let rank = 0; rank <= 9; rank++) every.push(card(color, rank))
+    every.push(card(color, '+2'))
+  }
+  every.push({ color: null, rank: '+4' })
+
+  for (const c of every) {
+    const drawn = cardsUi.big(c).split('\n')
+    const name = `${c.rank} ${c.color || 'comodín'}`
+    t.is(drawn.length, BIG.height, `${name} is ${BIG.height} rows`)
+    t.is(Math.max(...drawn.map(style.width)), BIG.width, `${name} is ${BIG.width} columns`)
+    // A pear is two columns wide, so an off-by-one here shears the whole hand.
+    t.ok(
+      drawn.every((line) => style.width(line) === BIG.width),
+      `${name} has no ragged row`
+    )
+
+    const compact = cardsUi.small(c).split('\n')
+    t.is(Math.max(...compact.map(style.width)), SMALL.width, `${name} compact is ${SMALL.width}`)
+  }
+})
+
+test('cards: the pips count the value', (t) => {
+  const { PEAR } = cardsUi
+  for (let rank = 0; rank <= 9; rank++) {
+    const drawn = stripAnsi(cardsUi.big(card('rojo', rank)))
+    const pears = [...drawn].filter((ch) => ch === PEAR).length
+    t.is(pears, rank, `a ${rank} shows ${rank} pears`)
+  }
+})
+
 test('cards: a +4 is drawn as a wild, not as a colour it does not have', (t) => {
   const wild = cardsUi.big({ color: null, rank: '+4' })
   t.ok(stripAnsi(wild).includes('+4'), 'it says +4')

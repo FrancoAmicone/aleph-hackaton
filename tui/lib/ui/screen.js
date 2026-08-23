@@ -199,7 +199,17 @@ function chatLines(game, width, height) {
 // Your hand, the selected card lifted, numbered like the keys that play it.
 // A hand grows well past the five it was dealt when stacks land on you, so it
 // is capped at what the canvas holds and the overflow is counted, not drawn.
-const HAND_SLOTS = 13
+// Pear cards are 12 columns wide, so eight of them plus their gaps is what the
+// canvas holds. A hand grows well past that when stacks land on you, so the
+// window scrolls to follow the selection — every card stays reachable with the
+// arrows even when it is not on screen.
+const HAND_SLOTS = 8
+
+function handWindow(total, selected) {
+  if (total <= HAND_SLOTS) return 0
+  const start = Math.min(Math.max(0, selected - Math.floor(HAND_SLOTS / 2)), total - HAND_SLOTS)
+  return Math.max(0, start)
+}
 
 function handLines(game, view) {
   const hand = game.hands[0]
@@ -207,29 +217,29 @@ function handLines(game, view) {
 
   if (hand.length === 0) return pad(style().faint(true).render('(sin cartas)'), CANVAS.width)
 
-  const shown = hand.slice(0, HAND_SLOTS)
+  const from = handWindow(hand.length, view.selected || 0)
+  const shown = hand.slice(from, from + HAND_SLOTS)
+
   const blocks = shown.map((card, i) =>
-    cards.big(card, { selected: yours && i === view.selected, dim: !yours })
+    cards.big(card, { selected: yours && from + i === view.selected, dim: !yours })
   )
 
   const row = style.joinHorizontal(style.position.top, ...interleave(blocks, ' '))
   const numbers = shown
     .map((_, i) => {
-      const tone = yours && i === view.selected ? SKY : STRONG
+      const at = from + i
+      const tone = yours && at === view.selected ? SKY : STRONG
       return style()
         .foreground(tone)
-        .render(pad(i < 9 ? `[${i + 1}]` : '·', 7))
+        .render(pad(at < 9 ? `[${at + 1}]` : '·', cards.BIG.width))
     })
     .join(' ')
 
-  const extra =
-    hand.length > HAND_SLOTS
-      ? style()
-          .faint(true)
-          .render(`  +${hand.length - HAND_SLOTS}`)
-      : ''
+  // Say what is off-screen rather than pretending the hand is only this long.
+  const hidden = hand.length - shown.length
+  const more = hidden > 0 ? style().faint(true).render(`  +${hidden} fuera de vista`) : ''
 
-  return stack(pad(row, CANVAS.width), pad(numbers + extra, CANVAS.width))
+  return stack(pad(row, CANVAS.width), pad(numbers + more, CANVAS.width))
 }
 
 function interleave(blocks, sep) {
@@ -245,7 +255,8 @@ function interleave(blocks, sep) {
 
 function renderHeader(game, view, width) {
   const title =
-    style().foreground(MID).render('▚▚  ') + style().bold(true).foreground(WHITE).render('U N O')
+    style().foreground(MID).render(`${cards.PEAR}  `) +
+    style().bold(true).foreground(WHITE).render('THE GREAT PEAR')
 
   const status = view.updateStatus
     ? style().foreground(view.updateStatus.color).render(view.updateStatus.text)

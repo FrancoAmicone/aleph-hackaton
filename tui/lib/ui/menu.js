@@ -4,6 +4,7 @@ const { CANVAS, pad, fit } = require('./canvas')
 const { SKY, MID, WHITE, NAVY, CARD_COLORS } = require('./palette')
 const { bars, SPEED } = require('./bars')
 const { COLORS } = require('../uno/deck')
+const { PEAR } = require('./cards')
 
 const MENU_ITEMS = [
   { id: 'jugar', label: 'Jugar' },
@@ -14,15 +15,15 @@ const MENU_ITEMS = [
   { id: 'salir', label: 'Salir' }
 ]
 
-// The headline: 80 columns, built from the same letterforms as before so the
-// wordmark still reads as the same family.
+// The headline: 103 columns. Most letterforms come from the original art; the
+// H and the P had to be drawn, since no earlier title used them.
 const HEADLINE = [
-  '███████╗██╗░░░░░  ░██████╗░██████╗░░█████╗░███╗░░██╗  ██╗░░░██╗███╗░░██╗░█████╗░',
-  '██╔════╝██║░░░░░  ██╔════╝░██╔══██╗██╔══██╗████╗░██║  ██║░░░██║████╗░██║██╔══██╗',
-  '█████╗░░██║░░░░░  ██║░░██╗░██████╔╝███████║██╔██╗██║  ██║░░░██║██╔██╗██║██║░░██║',
-  '██╔══╝░░██║░░░░░  ██║░░╚██╗██╔══██╗██╔══██║██║╚████║  ██║░░░██║██║╚████║██║░░██║',
-  '███████╗███████╗  ╚██████╔╝██║░░██║██║░░██║██║░╚███║  ╚██████╔╝██║░╚███║╚█████╔╝',
-  '╚══════╝╚══════╝  ░╚═════╝░╚═╝░░╚═╝╚═╝░░╚═╝╚═╝░░╚══╝  ░╚═════╝░╚═╝░░╚══╝░╚════╝░'
+  '████████╗██╗░░██╗███████╗  ░██████╗░██████╗░███████╗░█████╗░████████╗  ██████╗░███████╗░█████╗░██████╗░',
+  '╚══██╔══╝██║░░██║██╔════╝  ██╔════╝░██╔══██╗██╔════╝██╔══██╗╚══██╔══╝  ██╔══██╗██╔════╝██╔══██╗██╔══██╗',
+  '░░░██║░░░███████║█████╗░░  ██║░░██╗░██████╔╝█████╗░░███████║░░░██║░░░  ██████╔╝█████╗░░███████║██████╔╝',
+  '░░░██║░░░██╔══██║██╔══╝░░  ██║░░╚██╗██╔══██╗██╔══╝░░██╔══██║░░░██║░░░  ██╔═══╝░██╔══╝░░██╔══██║██╔══██╗',
+  '░░░██║░░░██║░░██║███████╗  ╚██████╔╝██║░░██║███████╗██║░░██║░░░██║░░░  ██║░░░░░███████╗██║░░██║██║░░██║',
+  '░░░╚═╝░░░╚═╝░░╚═╝╚══════╝  ░╚═════╝░╚═╝░░╚═╝╚══════╝╚═╝░░╚═╝░░░╚═╝░░░  ╚═╝░░░░░╚══════╝╚═╝░░╚═╝╚═╝░░╚═╝'
 ]
 
 // Rows of glitch bars above and below the title. Fixed, like everything else.
@@ -88,7 +89,7 @@ function renderMenu(view) {
   const chips = COLORS.map((c) => style().bold(true).foreground(CARD_COLORS[c]).render('██')).join(
     ' '
   )
-  const word = style().bold(true).foreground(WHITE).render('+2   ·   +4')
+  const word = style().bold(true).foreground(WHITE).render(`${PEAR}  +2  ·  +4  ${PEAR}`)
   const subtitle = `${chips}    ${word}    ${chips}`
 
   // The marker on the selected row pulses, so the screen reads as live even
@@ -152,9 +153,10 @@ function renderMenu(view) {
 
 const RULES = [
   ['Objetivo', 'Quedarte sin cartas antes que los demás. La partida es a 500 puntos.'],
-  ['El mazo', '88 cartas: números 0-9 en cuatro colores, ocho +2 y cuatro +4.'],
+  ['Las peras', 'Cada carta lleva su valor en peras: contás las peras y esa es la carta.'],
+  ['El mazo', '88 cartas en cuatro colores: 0-9 en peras, ocho +2 y cuatro +4.'],
   ['Reparto', 'Cinco cartas a cada uno. Se da vuelta una para empezar el descarte.'],
-  ['Tu turno', 'Tirás una carta que coincida en color o en número con la de arriba.'],
+  ['Tu turno', 'Tirás una carta que coincida en color, o que tenga las mismas peras.'],
   ['Si no podés', 'Robás una del mazo. Si esa sirve, la podés tirar en el acto.'],
   ['+2', 'El siguiente roba dos y pierde el turno — salvo que responda con otro +2.'],
   ['+4', 'Se puede tirar siempre. Elegís el color y el siguiente roba cuatro.'],

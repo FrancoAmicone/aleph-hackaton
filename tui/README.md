@@ -1,6 +1,6 @@
-# 🎴 El Gran UNO
+# 🍐 The Great Pear
 
-> UNO for the terminal — running on [Bare](https://github.com/holepunchto/bare), delivered and updated **peer-to-peer** with [Pear](https://docs.pears.com/).
+> UNO for the terminal, played with pears — running on [Bare](https://github.com/holepunchto/bare), delivered and updated **peer-to-peer** with [Pear](https://docs.pears.com/).
 
 No app store, no CDN, no server. You install it from a `pear://` link, and when a new
 version is staged it arrives over the swarm from whoever is seeding it.
@@ -9,10 +9,10 @@ version is staged it arrives over the swarm from whoever is seeding it.
 pear install pear://izkyzf8cdezbqb6hxqxnmg8584y1c5o5aj5c47x5ui7fdo5zd5co
 ```
 
-On macOS that installs `uno.app`; run the game with:
+On macOS that installs `pear-game.app`; run the game with:
 
 ```sh
-uno.app/Contents/MacOS/uno
+pear-game.app/Contents/MacOS/pear-game
 ```
 
 <details>
@@ -29,8 +29,8 @@ pear install --timeout 300 pear://izkyzf8cdezbqb6hxqxnmg8584y1c5o5aj5c47x5ui7fdo
 You can also pull the raw binary instead of installing:
 
 ```sh
-pear dump pear://izkyzf8cdezbqb6hxqxnmg8584y1c5o5aj5c47x5ui7fdo5zd5co ./uno-dl
-./uno-dl/by-arch/darwin-arm64/app/uno        # or darwin-x64 / linux-x64
+pear dump pear://izkyzf8cdezbqb6hxqxnmg8584y1c5o5aj5c47x5ui7fdo5zd5co ./pear-dl
+./pear-dl/by-arch/darwin-arm64/app/pear-game        # or darwin-x64 / linux-x64
 ```
 
 </details>
@@ -46,7 +46,8 @@ UNO for the terminal, played against three AI rivals, with a deck trimmed to
 first to 500 points takes it.
 
 - **88 cards**: 0-9 in four colours (one 0, two of each 1-9), two +2 per
-  colour, four +4.
+  colour, four +4. A number card shows its value as **pears** laid out like the
+  pips on a playing card — you read it by counting, not by reading a digit.
 - **Matching** by colour or by number. A +4 is always playable and its player
   names the colour that continues.
 - **Stacking**: a +2 is answered with another +2 and a +4 with another +4 — the
@@ -80,12 +81,12 @@ legal moves, so it can never offer you something the rules do not allow.
 ### Flags
 
 ```sh
-uno --jugadores 3          # 2, 3 or 4 at the table
-uno --nivel duro           # facil | normal | duro
-uno --meta 200             # points to win: 200, 300 or 500
-uno --jugar                # skip the menu and deal
-uno --no-updates           # disable OTA updates for this run
-uno --storage <dir>        # use a specific storage directory
+pear-game --jugadores 3          # 2, 3 or 4 at the table
+pear-game --nivel duro           # facil | normal | duro
+pear-game --meta 200             # points to win: 200, 300 or 500
+pear-game --jugar                # skip the menu and deal
+pear-game --no-updates           # disable OTA updates for this run
+pear-game --storage <dir>        # use a specific storage directory
 ```
 
 ## Running from source
@@ -96,7 +97,7 @@ Requires [Node.js](https://nodejs.org/) (for npm and the build scripts) and
 ```sh
 npm install
 npm start          # dev mode — updates disabled so your build is not swapped mid-hand
-npm test           # 128 tests
+npm test           # 130 tests
 ```
 
 ## How it is built
@@ -156,7 +157,7 @@ status line in the top-right corner.
 
 1. **Argument parsing was off by one in built binaries.** It sliced a fixed
    `Bare.argv.slice(2)`, which is right for `bare bin.js …` but wrong for a
-   standalone build invoked as `uno --jugadores 3` — the first flag was silently
+   standalone build invoked as `pear-game --jugadores 3` — the first flag was silently
    swallowed, and `--storage <dir>` aborted with `UNKNOWN_ARG`. Now it slices
    based on whether it is running under `bare`.
 2. **A late swarm connection could kill the app.** The `connection` handler
@@ -171,7 +172,7 @@ status line in the top-right corner.
 ### Tests
 
 ```
-npm test    # 128 tests, 490 assertions
+npm test    # 130 tests, 680 assertions
 ```
 
 Beyond the rule-by-rule unit tests, two of them carry most of the weight:
@@ -189,11 +190,11 @@ Beyond the rule-by-rule unit tests, two of them carry most of the weight:
 
 ## Platforms
 
-| Target      | Ships             | Status                  |
-| ----------- | ----------------- | ----------------------- |
-| macOS arm64 | `uno` + `uno.app` | built and run here      |
-| macOS x64   | `uno` + `uno.app` | cross-compiled, not run |
-| Linux x64   | `uno`             | cross-compiled, not run |
+| Target      | Ships                         | Status                  |
+| ----------- | ----------------------------- | ----------------------- |
+| macOS arm64 | `uno` + `uno.app`             | built and run here      |
+| macOS x64   | `pear-game` + `pear-game.app` | cross-compiled, not run |
+| Linux x64   | `pear-game`                   | cross-compiled, not run |
 
 Windows is buildable (`npm run make:win32-x64`) but is not part of this release.
 
@@ -215,11 +216,11 @@ pear seed  pear://izkyzf8cdezbqb6hxqxnmg8584y1c5o5aj5c47x5ui7fdo5zd5co
 deploy/
   package.json                                # its `version` is what the updater compares
   by-arch/
-    darwin-arm64/app/uno                      # plain binary — what a dump/direct install runs
-    darwin-arm64/app/uno.app/                 # bundle — the only shape `pear install` accepts
-        Contents/MacOS/uno
+    darwin-arm64/app/pear-game                      # plain binary — what a dump/direct install runs
+    darwin-arm64/app/pear-game.app/                 # bundle — the only shape `pear install` accepts
+        Contents/MacOS/pear-game
         Contents/Info.plist
-    linux-x64/app/uno
+    linux-x64/app/pear-game
 ```
 
 Both macOS artifacts ship side by side so either install style finds its own,
@@ -229,7 +230,7 @@ and a running copy asks the updater for whichever one it was started as.
 > stop it.
 
 > The binaries are named after `productName`, which changed from `truco` to
-> `uno` when the game did. Anything installed from an older stage looks for the
+> `pear-game` when the game did. Anything installed from an older stage looks for the
 > old name and will not find an update — re-stage before demoing.
 
 ### Shipping an update
