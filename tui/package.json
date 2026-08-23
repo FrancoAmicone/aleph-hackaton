@@ -1,11 +1,11 @@
 {
   "name": "the-great-pear",
-  "productName": "pear-game",
+  "productName": "the-great-pear",
   "version": "2.0.0",
   "description": "The Great Pear — a terminal UNO game on Bare, delivered and updated peer-to-peer with Pear.",
   "private": true,
   "bin": "bin.js",
-  "upgrade": "pear://izkyzf8cdezbqb6hxqxnmg8584y1c5o5aj5c47x5ui7fdo5zd5co",
+  "upgrade": "pear://u9y7y9xqggifyeihhi9i1cswyqdrtdjbg75y6obxxy6hwe6uu66o",
   "scripts": {
     "format": "prettier . --write",
     "test": "brittle-bare test/index.js",
@@ -13,12 +13,12 @@
     "start": "bare bin.js --no-updates",
     "make": "node scripts/make.js",
     "deploy": "node scripts/deploy.js",
-    "make:darwin-arm64": "bare-build --name pear-game --standalone --host darwin-arm64 --out ./out/darwin-arm64 bin.js",
-    "make:darwin-x64": "bare-build --name pear-game --standalone --host darwin-x64 --out ./out/darwin-x64 bin.js",
-    "make:linux-arm64": "bare-build --name pear-game --standalone --host linux-arm64 --out ./out/linux-arm64 bin.js",
-    "make:linux-x64": "bare-build --name pear-game --standalone --host linux-x64 --out ./out/linux-x64 bin.js",
-    "make:win32-arm64": "bare-build --name pear-game --standalone --host win32-arm64 --out ./out/win32-arm64 bin.js",
-    "make:win32-x64": "bare-build --name pear-game --standalone --host win32-x64 --out ./out/win32-x64 bin.js"
+    "make:darwin-arm64": "bare-build --name the-great-pear --standalone --host darwin-arm64 --out ./out/darwin-arm64 bin.js",
+    "make:darwin-x64": "bare-build --name the-great-pear --standalone --host darwin-x64 --out ./out/darwin-x64 bin.js",
+    "make:linux-arm64": "bare-build --name the-great-pear --standalone --host linux-arm64 --out ./out/linux-arm64 bin.js",
+    "make:linux-x64": "bare-build --name the-great-pear --standalone --host linux-x64 --out ./out/linux-x64 bin.js",
+    "make:win32-arm64": "bare-build --name the-great-pear --standalone --host win32-arm64 --out ./out/win32-arm64 bin.js",
+    "make:win32-x64": "bare-build --name the-great-pear --standalone --host win32-x64 --out ./out/win32-x64 bin.js"
   },
   "dependencies": {
     "bare-os": "^3.9.0",

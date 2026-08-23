@@ -1,6 +1,8 @@
 node_modules/
-dist/
 out/
+dist/
 deploy/
-.DS_Store
 deploy-*/
+*.log
+logs/
+.DS_Store

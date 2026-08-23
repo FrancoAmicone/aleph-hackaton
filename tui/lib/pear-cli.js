@@ -112,7 +112,14 @@ function createPearCli(pkg, opts = {}) {
     upgrade: pkg.upgrade,
     name: bundleName,
     store,
-    swarm
+    swarm,
+    // Sin esto pear-runtime usa su default de 3600000 ms: hasta UNA HORA de espera
+    // aleatoria antes de siquiera buscar una versión nueva. Sirve para no golpear
+    // el swarm con miles de clientes a la vez, pero hace imposible demostrar el OTA.
+    //
+    // Ojo: la copia instalada corre SU PROPIO código, así que bajarlo en la v2 no
+    // sirve — la que espera es la v1. Tiene que estar desde el primer release.
+    delay: 5000
   })
 
   const ctx = { pear, swarm, store, appName, dir }
