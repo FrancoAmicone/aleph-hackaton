@@ -15,7 +15,6 @@ const {
   partidaLines,
   chatLines
 } = require('../lib/ui/screen')
-const { titleBlock } = require('../lib/ui/menu')
 const { bars, block, GLYPHS } = require('../lib/ui/bars')
 const { CANVAS } = require('../lib/ui/canvas')
 const palette = require('../lib/ui/palette')
@@ -539,40 +538,66 @@ test('animation: runs on the menu and while rivals think, not on your turn', (t)
   t.absent(model._animating(), 'the rules card is still')
 })
 
-test('menu: settings cycle and Jugar deals a round', (t) => {
+test('menu: two buttons, arrows switch, CREATE deals, JOIN says there is no room yet', (t) => {
   const model = app()
-
   t.is(model.screen, 'menu', 'starts at the menu')
-  model.update(press('down')) // Jugadores
-  model.update(press('right'))
-  t.is(model.settings.jugadores, 2, 'players cycle')
+  t.is(model.menuIndex, 0, 'CREATE ROOM has the focus')
 
-  model.update(press('down')) // Rivales
-  model.update(press('right'))
-  t.is(model.settings.nivel, 'duro', 'rivals cycle up a level')
+  const frame = stripAnsi(model.view())
+  t.ok(frame.includes('▸ C R E A T E   R O O M ◂'), 'the focused button wears the arrows')
+  t.ok(frame.includes('J O I N   R O O M'), 'the other is drawn plain')
 
-  model.update(press('down')) // Partida
   model.update(press('right'))
-  t.is(model.settings.meta, 200, 'the target cycles')
+  t.is(model.menuIndex, 1, 'right moves to JOIN')
+  model.update(press('left'))
+  t.is(model.menuIndex, 0, 'left moves back')
+  model.update(press('right'))
+  model.update(press('right'))
+  t.is(model.menuIndex, 0, 'and it wraps rather than running off the end')
+
+  // No network yet: JOIN must say so, not pretend.
+  model.menuIndex = 1
+  model.update(press('enter'))
+  t.is(model.screen, 'menu', 'JOIN stays on the menu')
+  t.ok(model.message && model.message.includes('salas'), 'and says there is no room to join')
 
   model.menuIndex = 0
   model.update(press('enter'))
-
-  t.is(model.screen, 'game', 'Jugar deals')
-  t.is(model.game.playerCount, 2, 'and honours the player count')
-  t.is(model.game.target, 200, 'and the target')
+  t.is(model.screen, 'game', 'CREATE ROOM deals')
+  t.is(model.game.playerCount, 4, 'four at the table by default')
 })
 
-test('menu: the headline is always drawn at full size', (t) => {
-  const rows = titleBlock().split('\n')
-  t.is(rows.length, 6, 'six rows of block art')
-  t.ok(widest(rows.join('\n')) <= CANVAS.width, 'and it fits the canvas')
+test('menu: the pear turns as frames advance, and the title arches', (t) => {
+  const { archText } = require('../lib/ui/menu')
+  const model = app()
+
+  const a = stripAnsi(model.view())
+  model.frame = 12
+  const b = stripAnsi(model.view())
+  t.unlike(a, b, 'the menu redraws differently as the pear spins')
+  t.is(lines(b).length, CANVAS.height, 'and stays exactly the canvas height')
+
+  // The arch: the end letters sit lower than the middle ones. Measure the row
+  // each letter's topmost ink appears on, scanning the letter's whole column
+  // span — a single column can hit a gap inside a glyph.
+  const arch = archText('PEAR', 2)
+  t.ok(
+    arch.every((r) => r.length === arch[0].length),
+    'every row is the same width'
+  )
+  const topRow = (from, to) => arch.findIndex((r) => r.slice(from, to + 1).trim().length > 0)
+  const P = topRow(0, 4)
+  const E = topRow(6, 10)
+  const A = topRow(12, 16)
+  const R = topRow(18, 22)
+  t.ok(P > E, `P (row ${P}) starts below E (row ${E})`)
+  t.ok(R > A, `R (row ${R}) starts below A (row ${A})`)
+  t.is(E, A, 'the two middle letters sit level')
 })
 
 test('menu: rules screen opens and closes', (t) => {
   const model = app()
-  model.menuIndex = 4 // Reglas
-  model.update(press('enter'))
+  model.update(press('r')) // rules live on a key now, not a menu row
   t.is(model.screen, 'rules', 'rules opened')
 
   const frame = stripAnsi(model.view())
@@ -625,7 +650,7 @@ test('program: draws the menu and quits cleanly on ctrl+c', async (t) => {
 
   const drawn = Buffer.concat(chunks).toString('utf8')
   t.ok(drawn.length > 0, 'the program drew something')
-  t.ok(drawn.includes('Jugar'), 'it drew the menu')
+  t.ok(drawn.includes('C R E A T E   R O O M'), 'it drew the menu')
 })
 
 test('program: plays a card through the real key decoder', async (t) => {

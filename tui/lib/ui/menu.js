@@ -1,151 +1,144 @@
 // The title screen and the rules card.
 const { style } = require('../tea')
 const { CANVAS, pad, fit } = require('./canvas')
-const { SKY, MID, WHITE, NAVY, CARD_COLORS } = require('./palette')
+const { SKY, MID, WHITE } = require('./palette')
 const { bars, SPEED } = require('./bars')
-const { COLORS } = require('../uno/deck')
-const { PEAR } = require('./cards')
+const { frame } = require('./pear')
 
+// The two buttons, in the order they sit on screen.
 const MENU_ITEMS = [
-  { id: 'jugar', label: 'Jugar' },
-  { id: 'jugadores', label: 'Jugadores' },
-  { id: 'nivel', label: 'Rivales' },
-  { id: 'meta', label: 'Partida' },
-  { id: 'reglas', label: 'Reglas' },
-  { id: 'salir', label: 'Salir' }
+  { id: 'create', label: 'CREATE ROOM' },
+  { id: 'join', label: 'JOIN ROOM' }
 ]
 
-// The headline: 103 columns. Most letterforms come from the original art; the
-// H and the P had to be drawn, since no earlier title used them.
-const HEADLINE = [
-  '████████╗██╗░░██╗███████╗  ░██████╗░██████╗░███████╗░█████╗░████████╗  ██████╗░███████╗░█████╗░██████╗░',
-  '╚══██╔══╝██║░░██║██╔════╝  ██╔════╝░██╔══██╗██╔════╝██╔══██╗╚══██╔══╝  ██╔══██╗██╔════╝██╔══██╗██╔══██╗',
-  '░░░██║░░░███████║█████╗░░  ██║░░██╗░██████╔╝█████╗░░███████║░░░██║░░░  ██████╔╝█████╗░░███████║██████╔╝',
-  '░░░██║░░░██╔══██║██╔══╝░░  ██║░░╚██╗██╔══██╗██╔══╝░░██╔══██║░░░██║░░░  ██╔═══╝░██╔══╝░░██╔══██║██╔══██╗',
-  '░░░██║░░░██║░░██║███████╗  ╚██████╔╝██║░░██║███████╗██║░░██║░░░██║░░░  ██║░░░░░███████╗██║░░██║██║░░██║',
-  '░░░╚═╝░░░╚═╝░░╚═╝╚══════╝  ░╚═════╝░╚═╝░░╚═╝╚══════╝╚═╝░░╚═╝░░░╚═╝░░░  ╚═╝░░░░░╚══════╝╚═╝░░╚═╝╚═╝░░╚═╝'
-]
+// A 5-row block font — the glyphs "THE GREAT PEAR" needs.
+const FONT = {
+  T: ['█████', '  █  ', '  █  ', '  █  ', '  █  '],
+  H: ['█   █', '█   █', '█████', '█   █', '█   █'],
+  E: ['█████', '█    ', '███  ', '█    ', '█████'],
+  G: [' ████', '█    ', '█  ██', '█   █', ' ████'],
+  R: ['████ ', '█   █', '████ ', '█  █ ', '█   █'],
+  A: [' ███ ', '█   █', '█████', '█   █', '█   █'],
+  P: ['████ ', '█   █', '████ ', '█    ', '█    '],
+  ' ': ['   ', '   ', '   ', '   ', '   ']
+}
 
-// Rows of glitch bars above and below the title. Fixed, like everything else.
-const BAND_ROWS = 4
+// Big text on an ∩ arch: each whole letter shifts down by how far it sits
+// from the centre, so the line wraps over the pear without breaking a stroke.
+// `amp` is how many rows the ends drop below the middle.
+function archText(str, amp) {
+  const blocks = [...str.toUpperCase()].map((ch) => FONT[ch] || FONT[' '])
+  const widths = blocks.map((b) => b[0].length)
+  const gap = 1
+  const totalW = widths.reduce((a, w) => a + w + gap, 0) - gap
 
-const SHADOW = '░'
+  const centres = []
+  let x = 0
+  for (const w of widths) {
+    centres.push(x + w / 2)
+    x += w + gap
+  }
+  const mid = totalW / 2
+  const offs = centres.map((c) => {
+    const t = mid ? (c - mid) / mid : 0
+    return Math.round(amp * t * t)
+  })
 
-// The pulse the selected row's marker cycles through.
-const MARKERS = ['▶', '▷', '▶', '▸']
-
-// White letters with a dark shadow behind them, as in the reference. The ░
-// cells in the art are the shadow, so they take the dark tone while the strokes
-// stay white. Runs of one or the other are painted together, so a row costs a
-// handful of escape sequences rather than one per column.
-function paintRow(line) {
-  const solid = style().bold(true).foreground(WHITE)
-  const shade = style().foreground(NAVY)
-
-  let out = ''
-  let run = ''
-  let shadow = null
-
-  for (const ch of line) {
-    const isShadow = ch === SHADOW
-    if (shadow === null) shadow = isShadow
-    if (isShadow !== shadow) {
-      out += (shadow ? shade : solid).render(run)
-      run = ''
-      shadow = isShadow
+  const grid = Array.from({ length: 5 + amp }, () => Array(totalW).fill(' '))
+  x = 0
+  blocks.forEach((b, i) => {
+    for (let r = 0; r < 5; r++) {
+      for (let c = 0; c < widths[i]; c++) {
+        if (b[r][c] !== ' ') grid[offs[i] + r][x + c] = b[r][c]
+      }
     }
-    run += ch
-  }
-  if (run) out += (shadow ? shade : solid).render(run)
-  return out
+    x += widths[i] + gap
+  })
+  return grid.map((row) => row.join(''))
 }
 
-// White letters, dark shadow, always at full size.
+// Yellow at the top fading to green at the base: the pear's own colours.
+const TITLE_TONES = [226, 220, 190, 184, 148, 112, 106]
+
 function titleBlock() {
-  return HEADLINE.map(paintRow).join('\n')
+  const rows = [...archText('THE GREAT', 1), ...archText('PEAR', 1)]
+  return rows
+    .map((row, i) =>
+      style()
+        .bold(true)
+        .foreground(TITLE_TONES[Math.min(TITLE_TONES.length - 1, i)])
+        .render(row)
+    )
+    .join('\n')
 }
 
-const LEVEL_LABEL = { facil: 'fáciles', normal: 'normales', duro: 'duros' }
-
-function valueFor(item, settings) {
-  switch (item.id) {
-    case 'jugadores':
-      return `${settings.jugadores} en la mesa`
-    case 'nivel':
-      return LEVEL_LABEL[settings.nivel]
-    case 'meta':
-      return `a ${settings.meta} puntos`
-    default:
-      return null
-  }
+// A big button. Focus lifts it out with arrows and yellow; idle is grey.
+function button(label, focus, inner) {
+  const spaced = label.split('').join(' ')
+  const core = focus ? `▸ ${spaced} ◂` : spaced
+  const left = Math.floor((inner - core.length) / 2)
+  const line = ' '.repeat(left) + core + ' '.repeat(inner - core.length - left)
+  const tone = focus ? 226 : 244
+  const rows = [
+    '╔' + '═'.repeat(inner) + '╗',
+    '║' + ' '.repeat(inner) + '║',
+    '║' + line + '║',
+    '║' + ' '.repeat(inner) + '║',
+    '╚' + '═'.repeat(inner) + '╝'
+  ]
+  return rows.map((r, i) =>
+    style()
+      .foreground(tone)
+      .bold(focus && i === 2)
+      .render(r)
+  )
 }
+
+// Rows of glitch bars above the title. Fixed, like everything else.
+const BAND_ROWS = 2
+
+// The pear: this wide, this tall. Sized so the title, the pear and the buttons
+// all fit the 38-row canvas with room to breathe.
+const PEAR_W = 34
+const PEAR_H = 14
+
+// The pear turns this much per frame of the loop.
+const SPIN_PER_FRAME = 0.045
 
 function renderMenu(view) {
   const width = CANVAS.width
+  const t = (view.frame || 0) * SPEED
+
   const title = titleBlock()
+  const tagline = style().foreground(108).render('· uno · delivered p2p over pear ·')
+  const pear = frame((view.frame || 0) * SPIN_PER_FRAME, PEAR_W, PEAR_H)
 
-  // A sun between the suits, flanking the wordmark.
-  // Four swatches instead of card suits — the colours are what UNO is about.
-  const chips = COLORS.map((c) => style().bold(true).foreground(CARD_COLORS[c]).render('██')).join(
-    ' '
+  // Both buttons the same width, reserving room for the focus arrows.
+  const inner = 'CREATE ROOM'.length * 2 - 1 + 4 + 6
+  const row = style.joinHorizontal(
+    style.position.top,
+    button('CREATE ROOM', view.index === 0, inner).join('\n'),
+    '      ',
+    button('JOIN ROOM', view.index === 1, inner).join('\n')
   )
-  const word = style().bold(true).foreground(WHITE).render(`${PEAR}  +2  ·  +4  ${PEAR}`)
-  const subtitle = `${chips}    ${word}    ${chips}`
 
-  // The marker on the selected row pulses, so the screen reads as live even
-  // while nothing else is happening.
-  const pulse = MARKERS[Math.floor((view.frame || 0) / 3) % MARKERS.length]
-
-  const rows = MENU_ITEMS.map((item, i) => {
-    const active = i === view.index
-    const bullet = active ? style().foreground(SKY).render(`${pulse} `) : '  '
-    const label = active
-      ? style().bold(true).foreground(SKY).render(item.label.padEnd(10))
-      : style().foreground(WHITE).render(item.label.padEnd(10))
-
-    const value = valueFor(item, view.settings)
-    const shown = value
-      ? style()
-          .foreground(active ? SKY : WHITE)
-          .render(value)
-      : ''
-
-    const arrows = value && active ? style().foreground(SKY).render('  ←/→') : ''
-    return `${bullet}${label}${shown}${arrows}`
-  })
-
-  const box = style()
-    .width(46)
-    .padding(1, 2)
-    .border(style.borders.rounded)
-    .borderForeground(MID)
-    .render(rows.join('\n'))
-
-  const footer = style()
-    .foreground(WHITE)
-    .render('↑/↓ moverse · ENTER elegir · ←/→ cambiar · Q salir')
+  const hint = view.message
+    ? style().bold(true).foreground(226).render(view.message)
+    : style().foreground(244).render('←/→ elegir   ·   ↵ entrar   ·   R reglas   ·   Q salir')
 
   const status = view.updateStatus
     ? style().foreground(view.updateStatus.color).render(view.updateStatus.text)
     : style().foreground(WHITE).render(`v${view.version}  ·  corriendo sobre Pear + Bare`)
 
-  const t = (view.frame || 0) * SPEED
-
-  // The lower band is offset in time so the two are never mirror images.
-  const above = bars(width, BAND_ROWS, t)
-  const below = bars(width, BAND_ROWS, t + 41.7)
-
   return fit(
     [
-      ...above,
+      ...bars(width, BAND_ROWS, t),
       pad(title, width),
-      ...below,
+      pad(tagline, width),
+      pad(pear, width),
+      pad(row, width),
       '',
-      pad(subtitle, width),
-      '',
-      pad(box, width),
-      '',
-      pad(footer, width),
+      pad(hint, width),
       pad(status, width)
     ].join('\n')
   )
@@ -196,4 +189,4 @@ function renderRules() {
   return ['', pad(title, width), '', pad(box, width), '', pad(footer, width)].join('\n')
 }
 
-module.exports = { renderMenu, renderRules, MENU_ITEMS, titleBlock, BAND_ROWS }
+module.exports = { renderMenu, renderRules, MENU_ITEMS, titleBlock, archText, BAND_ROWS }

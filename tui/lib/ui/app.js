@@ -227,37 +227,24 @@ class App {
   _menuKey(msg) {
     if (key.matches(msg, 'q', 'escape')) return [this, quit]
 
-    if (key.matches(msg, 'up', 'k')) {
-      this.menuIndex = (this.menuIndex - 1 + MENU_ITEMS.length) % MENU_ITEMS.length
-      return [this, null]
-    }
-    if (key.matches(msg, 'down', 'j')) {
-      this.menuIndex = (this.menuIndex + 1) % MENU_ITEMS.length
+    // Two buttons side by side, so left/right is the natural way to move.
+    if (key.matches(msg, 'left', 'right', 'h', 'l', 'up', 'down', 'k', 'j', 'tab')) {
+      this.menuIndex = this.menuIndex === 0 ? 1 : 0
       return [this, null]
     }
 
-    const item = MENU_ITEMS[this.menuIndex]
-
-    if (key.matches(msg, 'left', 'right', 'h', 'l')) {
-      this._cycle(item.id, key.matches(msg, 'left', 'h') ? -1 : 1)
+    if (key.matches(msg, 'r')) {
+      this.screen = 'rules'
       return [this, null]
     }
 
     if (key.matches(msg, 'enter', 'space')) {
-      switch (item.id) {
-        case 'jugar':
-          return [this, this.startGame()]
-        case 'jugadores':
-        case 'nivel':
-        case 'meta':
-          this._cycle(item.id, 1)
-          return [this, null]
-        case 'reglas':
-          this.screen = 'rules'
-          return [this, null]
-        case 'salir':
-          return [this, quit]
-      }
+      const item = MENU_ITEMS[this.menuIndex]
+      if (item.id === 'create') return [this, this.startGame()]
+      // There is no network yet: a room to join does not exist. Say so rather
+      // than pretend, and keep the menu alive.
+      this.message = 'Todavía no hay salas para unirse — creá una.'
+      return [this, null]
     }
 
     return [this, null]
@@ -417,7 +404,12 @@ class App {
 
     const canvas =
       this.screen === 'menu'
-        ? renderMenu({ ...shared, index: this.menuIndex, settings: this.settings })
+        ? renderMenu({
+            ...shared,
+            index: this.menuIndex,
+            settings: this.settings,
+            message: this.message
+          })
         : this.screen === 'rules'
           ? fit(renderRules())
           : renderGame(this.game, {
