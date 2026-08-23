@@ -164,10 +164,14 @@ Se pasa en el constructor, en `workers/main.js`:
 const pear = new PearRuntime({ ...updaterConfig, swarm: updaterSwarm, store, delay: 5000 })
 ```
 
-> **[NUESTRO] Todavía no lo probamos.** Hay que verificar que el binario ya instalado
-> tome el delay nuevo — si el delay viejo está compilado en la v1, la v1 va a seguir esperando
-> lo que diga *su* código. **Conviene poner el delay bajo ANTES de publicar la v1 que se va a
-> usar en la demo.**
+> ✅ **APLICADO en v1.0.1** (`workers/main.js:44`).
+>
+> **La trampa, confirmada:** la instancia instalada corre *su propio* código. La v1.0.0 se
+> publicó sin `delay`, así que esa instancia espera hasta 1 hora **aunque la v2 tenga el delay
+> bajo**. Por eso hubo que publicar una v1.0.1 con el fix y reinstalarla ANTES de la demo.
+>
+> Regla general: **cualquier cambio en el comportamiento del updater sólo surte efecto a partir
+> de la versión SIGUIENTE a la que lo introduce.**
 
 ## Cómo debuggear si no anda
 
@@ -238,6 +242,9 @@ Y reintentar.
 | Mecanismo entendido y documentado | ✅ |
 | `pear stage` de v1.0.0 multiplataforma | ✅ drive length 7 |
 | `pear seed` corriendo | ✅ |
-| `pear install` en otra máquina | ⬜ **falta** |
-| OTA v1 → v2 demostrado | ⬜ **falta — es lo que se juzga** |
-| Delay bajado para la demo | ⬜ **falta, y conviene hacerlo antes de la v1 final** |
+| `pear install` en otra máquina | ✅ Gino, Ubuntu, 90 MB desde 1 peer |
+| Binarios cross-compilados corren | ✅ linux-x64 en Ubuntu |
+| Delay bajado a 5000 ms | ✅ v1.0.1 |
+| v1.0.1 publicada (5 plataformas) | ✅ drive length 13 |
+| Gino reinstala 1.0.1 | ⬜ **siguiente paso** |
+| OTA v1.0.1 → v1.0.2 demostrado | ⬜ **lo único que falta** |

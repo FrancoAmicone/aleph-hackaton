@@ -81,8 +81,8 @@ out/win32-x64/test-msg.exe  PE32+ executable (console) x86-64, for MS Windows
 **Una sola máquina compila para todo el equipo.** No hace falta repartir.
 
 ⚠️ En Windows el binario se llama `<nombre>.exe`, no `<nombre>`.
-⚠️ Lo que **no** está verificado es que esos binarios *corran* en sus plataformas.
-   Que Gino pruebe el de linux-x64 en su Ubuntu.
+✅ **Verificado que CORREN**: Gino ejecutó el binario linux-x64 en Ubuntu y arrancó bien.
+   El hallazgo de que la doc oficial se equivoca queda probado end-to-end.
 
 ### 4. Armar la carpeta de deployment ← **EL PASO QUE FALTABA**
 ```bash
@@ -169,8 +169,26 @@ ni actualizar. Terminal dedicada, laptop sin suspensión, y conviene un segundo 
 ```bash
 pear install pear://9nbjjp5jmtxxq3jj8ko7z4sdfnohucgwyjsxspdpsnuc8yf136my
 ```
-Sólo funciona si el seed está corriendo. Ojo: hoy sólo está publicado el binario
-**darwin-arm64**, así que sólo instala en Mac ARM. Para Linux hay que compilar en Linux.
+Sólo funciona si el seed está corriendo.
+
+**✅ VERIFICADO por Gino desde Ubuntu (22-ago):**
+```
+App: test-msg          Version: 1.0.0
+Pathname: /by-arch/linux-x64/app/test-msg
+Target: /home/acerlin/.local/bin/test-msg
+Installed
+```
+Bajó 90 MB desde **1 peer** (la máquina de Franco), sin servidor. Y el binario
+cross-compilado **corre**: `test-msg --version` → `test-msg v1.0.0`, exit 0.
+
+Están publicadas las 5 plataformas (`pear dump --list`):
+```
+/by-arch/darwin-arm64/app/test-msg
+/by-arch/darwin-x64/app/test-msg
+/by-arch/linux-arm64/app/test-msg
+/by-arch/linux-x64/app/test-msg
+/by-arch/win32-x64/app/test-msg.exe
+```
 
 ### Demostrar el OTA
 ```bash

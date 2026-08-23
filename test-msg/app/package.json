@@ -1,6 +1,6 @@
 {
   "name": "test-msg",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Chat P2P de terminal - prueba de flujo Pear OTA",
   "private": true,
   "bin": "bin.mjs",

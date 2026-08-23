@@ -182,8 +182,14 @@ Prioridad #1. Un juego perfecto sin OTA no califica.
 - [x] `pear build` → `deploy-multi/` (⚠️ **paso obligatorio**: stagear `out/` publica SIN el binario)
 - [x] `pear stage` → `pear://0.7.9nbjj…`
 - [x] `pear seed` corriendo (levanta versiones nuevas solo, no hay que reiniciarlo)
-- [ ] Instalado vía `pear install` en otra máquina
-- [ ] OTA verificado end-to-end (v1 corriendo → release v2 → se actualiza sola)
+- [x] **Instalado vía `pear install` en otra máquina** — Gino, Ubuntu, 90 MB desde 1 peer.
+      Los binarios cross-compilados **corren**, no sólo tienen el formato correcto.
+- [x] `delay: 5000` en el updater (`workers/main.js:44`) — sin esto espera hasta 1 HORA.
+      ⚠️ El cambio sólo surte efecto desde la versión SIGUIENTE: la instancia instalada
+      corre su propio código.
+- [x] v1.0.1 publicada con el fix (5 plataformas, drive length 13)
+- [ ] Gino reinstala 1.0.1 y deja la app corriendo
+- [ ] **OTA v1.0.1 → v1.0.2 demostrado** ← lo único que falta del pipeline
 
 > La key `pear://9nbjjp5jmtxxq3jj8ko7z4sdfnohucgwyjsxspdpsnuc8yf136my` es **de prueba**,
 > generada en `test-msg/app`. Nunca se stageó ni se seedeó nada en ella.
