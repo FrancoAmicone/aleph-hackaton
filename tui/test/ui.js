@@ -294,29 +294,34 @@ test('mesa: never grows wider than the canvas, whatever is said', (t) => {
   t.ok(widest(renderMesa(game, view)) <= CANVAS.width, 'nor a player holding two dozen cards')
 })
 
-test('mesa: the table is a piece of furniture, not a floating box', (t) => {
+test('mesa: a closed ring of █, widest in the middle, no legs', (t) => {
   const game = stacked({ top: card('rojo', 7), hands: [[card('rojo', 3)], [], [], []] })
   const plain = stripAnsi(renderMesa(game, view))
+  const rows = plain.split('\n').filter((r) => r.includes('█'))
 
-  // Top, rim, two leg rows, floor, shadow — in that order, each on its own row.
-  const order = ['╰', '║', '║', '╨', '░░░']
-  let at = -1
-  for (const mark of order) {
-    const next = plain.indexOf(mark, at + 1)
-    t.ok(next > at, `${mark} comes after the previous part`)
-    at = next
+  t.ok(rows.length >= 9, `the ring spans many rows (${rows.length})`)
+
+  // Every ring row is solid on both sides. The seats sit outside the ring on
+  // a couple of rows, so measure from the first █ to the last █, not from the
+  // row's first ink.
+  for (const r of rows) {
+    const ring = r.slice(r.indexOf('█'), r.lastIndexOf('█') + 1)
+    t.ok(ring.startsWith('█') && ring.endsWith('█'), 'ring ink on both edges')
   }
 
-  // The legs stand on the floor: the ╨ feet sit on the same columns as the ║.
-  const rows = plain.split('\n')
-  const legRow = rows.find((r) => r.includes('║'))
-  const floorRow = rows.find((r) => r.includes('╨'))
-  const legCols = [...legRow].map((ch, i) => (ch === '║' ? i : -1)).filter((i) => i >= 0)
-  const footCols = [...floorRow].map((ch, i) => (ch === '╨' ? i : -1)).filter((i) => i >= 0)
-  t.alike(footCols, legCols, 'each foot is directly under its leg')
+  // The top and bottom rows are solid caps — no hole — so the ring is closed.
+  const caps = [rows[0], rows[rows.length - 1]]
+  for (const cap of caps) t.absent(cap.trim().includes(' '), 'the cap is unbroken')
 
-  // The chrome must never widen the row or push the screen out of shape.
-  t.ok(widest(renderMesa(game, view)) <= CANVAS.width, 'the furniture fits the canvas')
+  // Widest in the middle, narrowing toward both caps: that is what makes it round.
+  const widths = rows.map((r) => r.lastIndexOf('█') - r.indexOf('█') + 1)
+  const mid = Math.floor(widths.length / 2)
+  t.ok(widths[mid] > widths[0] && widths[mid] > widths[widths.length - 1], 'widest at the middle')
+
+  // The legs are gone.
+  t.absent(plain.includes('║'), 'no legs')
+  t.absent(plain.includes('╨'), 'no feet')
+  t.ok(widest(renderMesa(game, view)) <= CANVAS.width, 'the table fits the canvas')
 })
 
 test('comandos: one line, only what the rules allow, and it always fits', (t) => {

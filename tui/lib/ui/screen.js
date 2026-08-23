@@ -21,11 +21,7 @@ const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', 
 const FELT = 46
 const FLANK = 12
 
-// The table's carpentry. Browns for the wood, a dark grey for the floor and
-// the shadow — none of them a card colour, so the table never looks like a
-// card.
-const WOOD = 130 // #af5f00
-const FLOOR = 238 // #444444
+// The shadow under the table: a dark grey, deliberately not a card colour.
 const SHADOW = 236 // #303030
 
 function stack(...blocks) {
@@ -145,12 +141,32 @@ function flankBeside(game, seat, view, align) {
 const TABLE_ROWS = 13
 const TABLE_HALF_W = 23 // half the width at the widest row
 
-function tableRowHalfWidth(row) {
-  const a = TABLE_HALF_W
+// Half-width of an ellipse at a given row. `a` is the horizontal radius; the
+// vertical radius is fixed by TABLE_ROWS.
+function ellipseHalfWidth(row, a) {
   const b = (TABLE_ROWS - 1) / 2
   const y = row - b
   const x = a * Math.sqrt(Math.max(0, 1 - (y * y) / (b * b)))
-  return Math.max(2, Math.round(x))
+  return Math.max(0, Math.round(x))
+}
+
+// The ring: the outer ellipse minus an inner one. Terminal cells are about
+// twice as tall as wide, so the ring has to be thicker in columns than in rows
+// to look the same all the way round — RING_W columns at the sides, and the
+// top and bottom rows solid across.
+const RING_W = 3
+const RING_ROWS = 1
+
+function tableRow(row) {
+  let outer = ellipseHalfWidth(row, TABLE_HALF_W)
+  const inner = ellipseHalfWidth(row, TABLE_HALF_W - RING_W)
+  // The top and bottom rows are the caps. At the very edge the ellipse rounds
+  // to nothing, so the cap is given a width of its own — wide enough to close
+  // the ring over the hole beneath it.
+  const cap = row < RING_ROWS || row >= TABLE_ROWS - RING_ROWS
+  if (cap) outer = Math.max(outer, ellipseHalfWidth(RING_ROWS, TABLE_HALF_W - RING_W) + 2)
+  const solid = cap || inner <= 0
+  return { outer, inner: solid ? 0 : inner }
 }
 
 function feltBlock(game, view) {
@@ -186,72 +202,37 @@ function feltBlock(game, view) {
   const innerRows = inner.split('\n')
   const status = dealing ? dealLine(game, view) : stackLine(game)
 
-  // Lay the content into the middle rows of the ellipse, the status line just
-  // under it, and fill the rest with felt.
+  // Lay the content into the hole's middle rows, the status line under it.
   const contentTop = Math.floor((TABLE_ROWS - innerRows.length - 2) / 2)
+  const ring = style().foreground(MID)
   const rows = []
   for (let r = 0; r < TABLE_ROWS; r++) {
-    const hw = tableRowHalfWidth(r)
-    const edgeL = r === 0 ? '╭' : r === TABLE_ROWS - 1 ? '╰' : '('
-    const edgeR = r === 0 ? '╮' : r === TABLE_ROWS - 1 ? '╯' : ')'
-    const span = hw * 2 - 2
-    let body
+    const { outer, inner: hole } = tableRow(r)
+    const side = ' '.repeat(TABLE_HALF_W - outer)
+    if (hole === 0) {
+      rows.push(side + ring.render('█'.repeat(outer * 2)) + side)
+      continue
+    }
+    const band = outer - hole
+    const span = hole * 2
     const ci = r - contentTop
+    let body
     if (ci >= 0 && ci < innerRows.length) body = pad(innerRows[ci], span)
     else if (ci === innerRows.length + 1) body = pad(status, span)
-    else if (r === 0 || r === TABLE_ROWS - 1) body = '─'.repeat(span)
     else body = ' '.repeat(span)
-    const side = ' '.repeat(TABLE_HALF_W - hw)
-    rows.push(
-      side +
-        style().foreground(MID).render(edgeL) +
-        body +
-        style().foreground(MID).render(edgeR) +
-        side
-    )
+    rows.push(side + ring.render('█'.repeat(band)) + body + ring.render('█'.repeat(band)) + side)
   }
   return tableSprite(rows.join('\n'), width)
 }
 
-// Dress the table top as a piece of furniture. The top is drawn by the caller
-// and carries all the game state; everything added here is pure chrome, which
-// is what keeps the game logic out of the carpentry.
-//
-//   ╭──────────────────╮   <- the felt (from the caller)
-//   ╰──────────────────╯
-//   ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀   <- the rim: the thickness of the wood
-//      ║            ║      <- legs
-//      ║            ║
-//    ▁▁╨▁▁▁▁▁▁▁▁▁▁▁▁╨▁▁    <- feet on the floor, and the floor itself
-//      ░░░░░░░░░░░░░░      <- shadow under the table
+// A soft shadow under the disc, narrower than the table, so it reads as
+// resting on something rather than floating. No legs: the table is a ring.
 function tableSprite(top, width) {
   const lines = top.split('\n')
-
-  // Legs a fifth of the way in from each side, bold so they read as solid.
-  const legAt = Math.max(2, Math.floor(width / 5))
-  const legRow = () => {
-    const leg = style().bold(true).foreground(WOOD).render('║')
-    const gap = width - 2 * legAt - 2
-    return ' '.repeat(legAt) + leg + ' '.repeat(gap) + leg + ' '.repeat(legAt)
-  }
-
-  // Feet meet the floor line; the floor runs the full width of the table.
-  const foot = style().bold(true).foreground(WOOD).render('╨')
-  const floorInk = style().foreground(FLOOR)
-  const floor =
-    floorInk.render('▁'.repeat(legAt)) +
-    foot +
-    floorInk.render('▁'.repeat(width - 2 * legAt - 2)) +
-    foot +
-    floorInk.render('▁'.repeat(legAt))
-
-  // A soft shadow under the top, narrower than the table, so it looks lit
-  // from above rather than painted on.
-  const shadowW = width - 6
+  const shadowW = width - 8
   const shadow =
-    ' '.repeat(3) + style().foreground(SHADOW).render('░'.repeat(shadowW)) + ' '.repeat(3)
-
-  return [...lines, legRow(), legRow(), floor, shadow].join('\n')
+    ' '.repeat(4) + style().foreground(SHADOW).render('░'.repeat(shadowW)) + ' '.repeat(4)
+  return [...lines, shadow].join('\n')
 }
 
 // The bottom line of the felt during the deal: a card sliding from the pile
