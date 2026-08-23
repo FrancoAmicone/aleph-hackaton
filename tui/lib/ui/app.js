@@ -12,6 +12,7 @@ const { renderGame } = require('./screen')
 const { renderMenu, renderRules, MENU_ITEMS } = require('./menu')
 const { renderResult, BUTTONS } = require('./result')
 const { renderBoot, BOOT_FRAMES } = require('./boot')
+const { renderIntro, INTRO_FRAMES } = require('./intro')
 const { fit, centre, tooSmall, tooSmallFor } = require('./canvas')
 
 // How long the rivals "think", in ms.
@@ -23,9 +24,13 @@ const CLEAR_SAY = 2600
 // keeps the redraw cost off the floor.
 const FRAME_MS = 80
 
-// The deal: each card takes this many frames to fly from the pile to its seat.
-// Twenty cards at three frames is five seconds, which is enough to read as a
-// deal and not so long it becomes a wait.
+// The deal runs faster than the rest so it reads as a brisk shuffle-out rather
+// than a wait: three frames per card at this cadence is a snappy ~55ms a step.
+const DEAL_FRAME_MS = 55
+
+// The deal: each card takes this many frames to fly from the centre to its
+// seat. Three frames is one at the centre, one mid-flight, one arriving — the
+// fewest that still reads as a throw rather than a jump.
 const DEAL_FRAMES = 3
 
 class App {
@@ -59,6 +64,8 @@ class App {
     this.frame = 0
     // Advances while the boot splash plays; the splash is a function of it.
     this.bootFrame = 0
+    // Advances while the into-game transition plays; the pear grows off it.
+    this.introFrame = 0
     // While a deal is in progress: how many cards have landed, and how many
     // frames the current one has been in the air. null between deals.
     this.dealing = null
@@ -88,17 +95,30 @@ class App {
   // for a still picture.
   _animating() {
     if (this.think.frame === 0) return false
-    if (this.screen === 'boot') return true
+    if (this.screen === 'boot' || this.screen === 'intro') return true
     if (this.screen === 'menu' || this.screen === 'result') return true
     if (this.screen !== 'game' || !this.game) return false
     return this.dealing !== null || this.game.currentActor() !== this.me
   }
 
   _animate() {
-    return this._animating() ? tick(FRAME_MS, () => ({ type: 'frame' })) : null
+    if (!this._animating()) return null
+    // The deal gets its own faster clock; everything else runs at FRAME_MS.
+    const ms = this.dealing !== null ? DEAL_FRAME_MS : FRAME_MS
+    return tick(ms, () => ({ type: 'frame' }))
   }
 
   // --- lifecycle -------------------------------------------------------
+
+  // The door into a game from the menu: play the pear-swell transition first,
+  // then deal. Tests (and the instant-deal path) skip straight to the board, so
+  // nothing that drives the model directly ever waits on the animation.
+  _enterGame() {
+    if (this.think.frame === 0 || this.think.deal === 0) return this.startGame()
+    this.screen = 'intro'
+    this.introFrame = 0
+    return this._animate()
+  }
 
   startGame() {
     const level = this.settings.nivel
@@ -215,6 +235,14 @@ class App {
           return [this, this._animate()]
         }
 
+        // The pear swells to cover the screen; when it has, the game is dealt
+        // and the deal itself reveals the board behind it.
+        if (this.screen === 'intro') {
+          this.introFrame++
+          if (this.introFrame >= INTRO_FRAMES) return [this, this.startGame()]
+          return [this, this._animate()]
+        }
+
         this.frame++
         if (this.dealing !== null && this._advanceDeal()) {
           // Last card down: the deal is over and play can begin.
@@ -297,7 +325,7 @@ class App {
       case 'start':
         if (!this.online || !this.online.asientos) return [this, null]
         this.settings.jugadores = this.online.asientos.length
-        return [this, this.startGame()]
+        return [this, this._enterGame()]
 
       case 'action': {
         // Una acción de otro jugador. Se aplica tal cual: todos los peers
@@ -365,6 +393,15 @@ class App {
   _menuKey(msg) {
     if (key.matches(msg, 'q', 'escape')) return [this, quit]
 
+    // L = jugar local contra bots, sin red. Va ANTES del toggle porque la 'l'
+    // minúscula mueve entre botones (estilo vim): sin esto, la L nunca llegaba.
+    // Se acepta 'L' y también 'l' con shift, según cómo lo reporte la terminal.
+    if (key.matches(msg, 'L') || (msg.shift && key.matches(msg, 'l'))) {
+      this.online = null
+      this.me = 0
+      return [this, this._enterGame()]
+    }
+
     // Two buttons side by side, so left/right is the natural way to move.
     if (key.matches(msg, 'left', 'right', 'h', 'l', 'up', 'down', 'k', 'j', 'tab')) {
       this.menuIndex = this.menuIndex === 0 ? 1 : 0
@@ -406,7 +443,7 @@ class App {
       // Sin capa de red (tests, o el worker caído) el juego sigue siendo el de
       // siempre: una partida local contra bots.
       if (!this.net) {
-        if (item.id === 'create') return [this, this.startGame()]
+        if (item.id === 'create') return [this, this._enterGame()]
         this.message = 'No network available — play local.'
         return [this, null]
       }
@@ -420,14 +457,6 @@ class App {
           ? `Creating room "${sala}" — looking for players…`
           : `Joining "${sala}" — looking…`
       return [this, null]
-    }
-
-    // L = jugar local contra bots, sin red. Es el modo de desarrollo: deja
-    // probar toda la UI sin coordinar a cuatro personas.
-    if (key.matches(msg, 'L')) {
-      this.online = null
-      this.me = 0
-      return [this, this.startGame()]
     }
 
     return [this, null]
@@ -613,25 +642,29 @@ class App {
     const canvas =
       this.screen === 'boot'
         ? renderBoot({ frame: this.bootFrame, version: this.version })
-        : this.screen === 'menu'
-        ? renderMenu({
-            ...shared,
-            index: this.menuIndex,
-            settings: this.settings,
-            message: this.message
-          })
-        : this.screen === 'rules'
-          ? fit(renderRules())
-          : this.screen === 'result'
-            ? renderResult(this.game, { ...shared, index: this.resultIndex })
-            : renderGame(this.game, {
+        : this.screen === 'intro'
+          ? renderIntro(this.introFrame)
+          : this.screen === 'menu'
+            ? renderMenu({
                 ...shared,
-                selected: this.selected,
-                says: this.says,
-                message: this.message,
-                dealt: this.dealing ? this.dealing.landed : undefined,
-                flight: this.dealing ? this.dealing.age / DEAL_FRAMES : undefined
+                index: this.menuIndex,
+                settings: this.settings,
+                message: this.message
               })
+            : this.screen === 'rules'
+              ? fit(renderRules())
+              : this.screen === 'result'
+                ? renderResult(this.game, { ...shared, index: this.resultIndex })
+                : renderGame(this.game, {
+                    ...shared,
+                    selected: this.selected,
+                    says: this.says,
+                    message: this.message,
+                    dealt: this.dealing ? this.dealing.landed : undefined,
+                    // Normalised 0→1 across a card's frames: 0 at the centre, 1 as
+                    // it reaches the seat, so the throw lands where the count bumps.
+                    flight: this.dealing ? this.dealing.age / (DEAL_FRAMES - 1) : undefined
+                  })
 
     return centre(canvas, this.width, this.height)
   }

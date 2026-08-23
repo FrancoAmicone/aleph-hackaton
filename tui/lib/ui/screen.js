@@ -189,38 +189,55 @@ function feltBlock(game, view) {
     pad(style().faint(true).render(`DECK ${pileCount}`), 9),
     pad(cards.bigBack(), 9)
   )
-  const descarte = stack(
-    pad(style().faint(true).render('DISCARD'), 9),
-    pad(dealing ? cards.bigBack() : cards.big(game.top), 9)
-  )
-  const colorLabel = dealing ? '—' : COLOR_NAMES[game.activeColor] || '—'
-  const color = stack(
-    pad(style().faint(true).render('COLOR'), 9),
-    '',
-    pad(cards.colorChip(dealing ? null : game.activeColor), 9),
-    pad(
-      style()
-        .foreground(!dealing && game.activeColor ? CARD_COLORS[game.activeColor] : WHITE)
-        .render(colorLabel),
-      9
+
+  // During the deal there is no discard and no colour in play yet, and the
+  // cards need clear lanes to fly through — so the felt shows only the deck at
+  // its centre, the source every card is thrown from. Once play begins the
+  // full three-column dashboard comes back.
+  let inner
+  let status
+  if (dealing) {
+    inner = mazo
+    status = ''
+  } else {
+    const descarte = stack(
+      pad(style().faint(true).render('DISCARD'), 9),
+      pad(cards.big(game.top), 9)
     )
-  )
-  // 9 + 2 + 9 + 2 + 9 = 31 columns, inside the 32-column hole at its widest.
-  const inner = style.joinHorizontal(style.position.top, mazo, '  ', descarte, '  ', color)
+    const colorLabel = COLOR_NAMES[game.activeColor] || '—'
+    const color = stack(
+      pad(style().faint(true).render('COLOR'), 9),
+      '',
+      pad(cards.colorChip(game.activeColor), 9),
+      pad(
+        style()
+          .foreground(game.activeColor ? CARD_COLORS[game.activeColor] : WHITE)
+          .render(colorLabel),
+        9
+      )
+    )
+    // 9 + 2 + 9 + 2 + 9 = 31 columns, inside the 32-column hole at its widest.
+    inner = style.joinHorizontal(style.position.top, mazo, '  ', descarte, '  ', color)
+    status = stackLine(game)
+  }
   const innerRows = inner.split('\n')
-  const status = dealing ? dealLine(game, view) : stackLine(game)
 
   // Lay the content into the hole's middle rows, the status line under it.
   const contentTop = Math.floor((TABLE_ROWS - innerRows.length - 2) / 2) + 1
   // The table edge is white: structural chrome, not a card and not an accent.
   const ring = style().foreground(WHITE)
   const rows = []
+  // The table-grid row each output line stands for, so the flying card can be
+  // stamped by position: rows at the very top and bottom are skipped, so output
+  // index and grid row are not the same thing.
+  const rowR = []
   for (let r = 0; r < TABLE_ROWS; r++) {
     const { outer, inner: hole } = tableRow(r)
     if (outer === 0) continue
     const side = ' '.repeat(TABLE_HALF_W - outer)
     if (hole === 0) {
       rows.push(side + ring.render('█'.repeat(outer * 2)) + side)
+      rowR.push(r)
       continue
     }
     const band = outer - hole
@@ -235,40 +252,114 @@ function feltBlock(game, view) {
     // the centre. Centre the content, then hard-cut the result to the span.
     body = hole_(body, span)
     rows.push(side + ring.render('█'.repeat(band)) + body + ring.render('█'.repeat(band)) + side)
+    rowR.push(r)
   }
+  if (dealing) stampFlyingCard(rows, rowR, game, view)
   return tableSprite(rows.join('\n'))
+}
+
+// --- the flying card -----------------------------------------------------
+
+// The card grows as it travels, from a slip at the centre to a full-size back
+// as it reaches the hand — the closer it gets, the bigger it reads. Each size
+// is a plain sprite; the largest whose threshold `t` has passed is drawn.
+const FLY_SIZES = [
+  { at: 0.0, lines: ['┌─┐', '└─┘'] },
+  { at: 0.4, lines: ['┌───┐', '│▚▚▚│', '└───┘'] },
+  { at: 0.72, lines: ['┌─────┐', '│▚▚▚▚▚│', '│▚▚▚▚▚│', '└─────┘'] }
+]
+
+// While the deck deals, one card is always on its way from the centre of the
+// felt out to the seat about to receive it. It is drawn as a sprite laid over
+// the felt at the interpolated point between the middle and that seat's side of
+// the table — down to you, up to the far seat, out to the flanks — swelling and
+// brightening the whole way so it clearly arrives rather than fades out.
+function stampFlyingCard(rows, rowR, game, view) {
+  const flight = inFlight(game, view)
+  if (!flight) return
+
+  const n = game.playerCount
+  const offset = (flight.seat - (view.me ?? 0) + n) % n
+  const t = Math.max(0, Math.min(1, flight.t))
+
+  // The centre of the hole, and how far a card travels before it reaches the
+  // seat — kept short of the ring so even the full-size sprite clears the edge.
+  const centreR = Math.floor((TABLE_ROWS - 1) / 2)
+  const centreC = TABLE_HALF_W
+  const REACH_R = 6
+  const REACH_C = 15
+
+  let r = centreR
+  let c = centreC
+  if (offset === 0)
+    r = Math.round(centreR + REACH_R * t) // you, below
+  else if (offset === 2)
+    r = Math.round(centreR - REACH_R * t) // across, above
+  else if (offset === 1)
+    c = Math.round(centreC + REACH_C * t) // right flank
+  else if (offset === 3)
+    c = Math.round(centreC - REACH_C * t) // left flank
+  else return
+
+  // Cool blue far off, warming to a white flash as it lands in the hand.
+  const tone = t < 0.4 ? BLUE : t < 0.72 ? LIGHT : t < 0.92 ? SKY : WHITE
+  const paint = style().bold(true).foreground(tone)
+
+  const size = FLY_SIZES.filter((s) => t >= s.at).pop() || FLY_SIZES[0]
+  const w = size.lines[0].length
+  const h = size.lines.length
+  const topR = r - Math.floor(h / 2)
+  const atCol = c - Math.floor(w / 2)
+
+  size.lines.forEach((sprite, i) => stampRow(rows, rowR, topR + i, atCol, paint.render(sprite), w))
+}
+
+// Overlay one sprite row, but only where it fully clears the felt hole — never
+// over the solid ring or off its edge, so the table outline stays intact even
+// as the card swells near a narrow part of the ellipse.
+function stampRow(rows, rowR, r, atCol, stamp, w) {
+  const idx = rowR.indexOf(r)
+  if (idx === -1) return
+  const { inner: hole } = tableRow(r)
+  if (hole === 0 || atCol < TABLE_HALF_W - hole || atCol + w > TABLE_HALF_W + hole) return
+  rows[idx] = overlayAt(rows[idx], atCol, stamp, w)
+}
+
+// Splice a pre-styled sprite `w` cells wide into a styled line at visible column
+// `atCol`, dropping the cells it covers. ANSI escapes are always copied through
+// (so the runs behind the sprite still close), only visible cells are replaced.
+function overlayAt(line, atCol, stamp, w) {
+  let out = ''
+  let vis = 0
+  let placed = false
+  let i = 0
+  while (i < line.length) {
+    if (line[i] === '\x1b') {
+      let j = i + 1
+      while (j < line.length && !/[A-Za-z]/.test(line[j])) j++
+      out += line.slice(i, j + 1)
+      i = j + 1
+      continue
+    }
+    const cp = line.codePointAt(i)
+    const ch = String.fromCodePoint(cp)
+    if (vis >= atCol && vis < atCol + w) {
+      if (!placed) {
+        out += stamp
+        placed = true
+      }
+    } else {
+      out += ch
+    }
+    vis += 1
+    i += ch.length
+  }
+  return out
 }
 
 // The table is the ring and nothing else — no floor, no shadow.
 function tableSprite(top) {
   return top
-}
-
-// The bottom line of the felt during the deal: a card sliding from the pile
-// towards whoever it is for, with the pile on the left and the seat's name on
-// the right.
-function dealLine(game, view) {
-  const flight = inFlight(game, view)
-  if (!flight) return style().faint(true).render('dealing…')
-
-  const name = game.players[flight.seat].name
-  // 'deck ' (5) + track + ' ▶ ' (3) + name must fit the hole's widest row.
-  const track = 14
-  const at = Math.round(flight.t * (track - 1))
-
-  let lane = ''
-  for (let i = 0; i < track; i++) lane += i === at ? '▚' : '·'
-
-  return (
-    style().faint(true).render('deck ') +
-    style().foreground(MID).render(lane.slice(0, at)) +
-    style().bold(true).foreground(SKY).render('▚') +
-    style()
-      .faint(true)
-      .render(lane.slice(at + 1)) +
-    style().faint(true).render(' ▶ ') +
-    style().bold(true).foreground(SKY).render(name)
-  )
 }
 
 // A live +2/+4 stack is the most urgent thing on the table.

@@ -118,7 +118,9 @@ function renderMenu(view) {
 
   const hint = view.message
     ? style().bold(true).foreground(226).render(view.message)
-    : style().foreground(244).render('←/→ select   ·   ↵ enter   ·   R rules   ·   Q quit')
+    : style()
+        .foreground(244)
+        .render('←/→ select   ·   ↵ enter   ·   L local   ·   R rules   ·   Q quit')
 
   const status = view.updateStatus
     ? style().foreground(view.updateStatus.color).render(view.updateStatus.text)

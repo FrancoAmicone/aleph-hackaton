@@ -337,12 +337,18 @@ const EXTENT = (() => {
   return { umin, umax, vmin, vmax }
 })()
 
-function frame(spin, W, H) {
+// `zoom` scales the pear past its fit: at 1 the whole fruit sits inside W×H;
+// above 1 it overflows and the projection clips to the box, so a big enough
+// zoom fills the frame with nothing but pear — which is how the intro grows it
+// until it covers the screen.
+function frame(spin, W, H, zoom = 1, bg = null) {
   // Fill the height, unless the width is the tighter fit.
-  const K1 = Math.min(
-    (H - 0.02) / (EXTENT.umax - EXTENT.umin),
-    (W - 0.02) / (ASPECT * (EXTENT.vmax - EXTENT.vmin))
-  )
+  const K1 =
+    zoom *
+    Math.min(
+      (H - 0.02) / (EXTENT.umax - EXTENT.umin),
+      (W - 0.02) / (ASPECT * (EXTENT.vmax - EXTENT.vmin))
+    )
   const cy = 0.01 - K1 * EXTENT.umin + (H - 0.02 - K1 * (EXTENT.umax - EXTENT.umin)) / 2
   const cx = W * 0.5 - (ASPECT * K1 * (EXTENT.vmax + EXTENT.vmin)) / 2
 
@@ -392,7 +398,10 @@ function frame(spin, W, H) {
       Math.max(6, Math.min(74, Math.round((26 + 44 * lum + LO[i]) / 4) * 4))
   }
 
-  // Emit with ANSI-256 colour, reusing the code while it does not change.
+  // Emit with ANSI-256 colour, reusing the code while it does not change. Empty
+  // cells are spaces unless `bg` is given, in which case they are a filled block
+  // in that colour — folded into the same run tracking, so no colour bleeds past
+  // where it was set. The intro uses it to flood the gaps and cover the screen.
   const rows = []
   for (let j = 0; j < H; j++) {
     let line = '',
@@ -400,7 +409,15 @@ function frame(spin, W, H) {
     for (let i = 0; i < W; i++) {
       const k = j * W + i
       if (cb[k] < 0) {
-        line += ' '
+        if (bg == null) {
+          line += ' '
+          continue
+        }
+        if (bg !== cur) {
+          line += `\x1b[38;5;${bg}m`
+          cur = bg
+        }
+        line += '█'
         continue
       }
       const col = ansiFor(kb[k])

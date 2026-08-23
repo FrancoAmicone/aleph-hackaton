@@ -85,9 +85,7 @@ function renderBoot(view) {
   // right (W + BAND), so the last glyph column gets its moment in the crest
   // before the wipe completes. After that the logo is simply lit.
   const edge =
-    frame >= SWEEP_FRAMES
-      ? TITLE_W + BAND
-      : Math.round((frame / SWEEP_FRAMES) * (TITLE_W + BAND))
+    frame >= SWEEP_FRAMES ? TITLE_W + BAND : Math.round((frame / SWEEP_FRAMES) * (TITLE_W + BAND))
 
   const title = titleAt(edge)
 
