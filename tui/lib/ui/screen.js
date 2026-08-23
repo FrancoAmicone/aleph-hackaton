@@ -405,20 +405,6 @@ function interleave(blocks, sep) {
 
 // --- chrome --------------------------------------------------------------
 
-function renderHeader(game, view, width) {
-  const title =
-    style().foreground(MID).render(`${cards.PEAR}  `) +
-    style().bold(true).foreground(WHITE).render('THE GREAT PEAR')
-
-  const status = view.updateStatus
-    ? style().foreground(view.updateStatus.color).render(view.updateStatus.text)
-    : style().faint(true).render(`v${view.version}`)
-
-  const room = width - style.width(title) - style.width(status)
-  return title + ' '.repeat(Math.max(1, room)) + status
-}
-
-// Everyone's score on one line — there are no teams in UNO.
 function renderScore(game, width, view = {}) {
   const fewest = Math.min(...game.hands.map((h) => h.length))
   const parts = game.players.map((p, seat) => {
