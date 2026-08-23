@@ -295,6 +295,31 @@ test('mesa: never grows wider than the canvas, whatever is said', (t) => {
   t.ok(widest(renderMesa(game, view)) <= CANVAS.width, 'nor a player holding two dozen cards')
 })
 
+test('mesa: the table is a piece of furniture, not a floating box', (t) => {
+  const game = stacked({ top: card('rojo', 7), hands: [[card('rojo', 3)], [], [], []] })
+  const plain = stripAnsi(renderMesa(game, view))
+
+  // Top, rim, two leg rows, floor, shadow — in that order, each on its own row.
+  const order = ['╰', '▀▀▀', '║', '║', '╨', '░░░']
+  let at = -1
+  for (const mark of order) {
+    const next = plain.indexOf(mark, at + 1)
+    t.ok(next > at, `${mark} comes after the previous part`)
+    at = next
+  }
+
+  // The legs stand on the floor: the ╨ feet sit on the same columns as the ║.
+  const rows = plain.split('\n')
+  const legRow = rows.find((r) => r.includes('║'))
+  const floorRow = rows.find((r) => r.includes('╨'))
+  const legCols = [...legRow].map((ch, i) => (ch === '║' ? i : -1)).filter((i) => i >= 0)
+  const footCols = [...floorRow].map((ch, i) => (ch === '╨' ? i : -1)).filter((i) => i >= 0)
+  t.alike(footCols, legCols, 'each foot is directly under its leg')
+
+  // The chrome must never widen the row or push the screen out of shape.
+  t.ok(widest(renderMesa(game, view)) <= CANVAS.width, 'the furniture fits the canvas')
+})
+
 test('comandos: one line, only what the rules allow, and it always fits', (t) => {
   const game = stacked({
     top: card('rojo', 7),

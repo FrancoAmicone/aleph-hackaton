@@ -21,6 +21,14 @@ const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', 
 const FELT = 46
 const FLANK = 12
 
+// The table's carpentry. Browns for the wood, a dark grey for the floor and
+// the shadow — none of them a card colour, so the table never looks like a
+// card.
+const WOOD = 130 // #af5f00
+const WOOD_DARK = 94 // #875f00
+const FLOOR = 238 // #444444
+const SHADOW = 236 // #303030
+
 function stack(...blocks) {
   return blocks.filter((b) => b !== null && b !== undefined).join('\n')
 }
@@ -115,6 +123,18 @@ function flankLine(game, seat, view, align) {
   return rows.map((r) => pad(style.truncate(r, FLANK), FLANK, align)).join('\n')
 }
 
+// A flank centred on the felt's rows. Built to a fixed height so the seat
+// stays put whether or not it has a ¡UNO! or a speech bubble that frame.
+function flankBeside(game, seat, view, align) {
+  const rows = flankLine(game, seat, view, align).split('\n')
+  const feltRows = 7 // border + 4 content rows + stack line + border
+  const top = Math.max(0, Math.floor((feltRows - rows.length) / 2))
+  const out = []
+  for (let i = 0; i < top; i++) out.push(' '.repeat(FLANK))
+  out.push(...rows)
+  return out.join('\n')
+}
+
 // --- the felt ------------------------------------------------------------
 
 // The middle of the table: the draw pile, the discard pile, and the colour in
@@ -156,11 +176,59 @@ function feltBlock(game, view) {
 
   const middle = style.joinHorizontal(style.position.top, mazo, descarte, color)
 
-  const rows = ['╭' + '─'.repeat(inner) + '╮']
-  for (const line of middle.split('\n')) rows.push(pad(line, inner))
-  rows.push(pad(view.dealt === undefined ? stackLine(game) : dealLine(game, view), inner))
-  rows.push('╰' + '─'.repeat(inner) + '╯')
-  return rows.join('\n')
+  const top = ['╭' + '─'.repeat(inner) + '╮']
+  for (const line of middle.split('\n')) top.push(pad(line, inner))
+  top.push(pad(view.dealt === undefined ? stackLine(game) : dealLine(game, view), inner))
+  top.push('╰' + '─'.repeat(inner) + '╯')
+
+  return tableSprite(top.join('\n'))
+}
+
+// Dress the table top as a piece of furniture. The top is drawn by the caller
+// and carries all the game state; everything added here is pure chrome, which
+// is what keeps the game logic out of the carpentry.
+//
+//   ╭──────────────────╮   <- the felt (from the caller)
+//   ╰──────────────────╯
+//   ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀   <- the rim: the thickness of the wood
+//      ║            ║      <- legs
+//      ║            ║
+//    ▁▁╨▁▁▁▁▁▁▁▁▁▁▁▁╨▁▁    <- feet on the floor, and the floor itself
+//      ░░░░░░░░░░░░░░      <- shadow under the table
+function tableSprite(top) {
+  const lines = top.split('\n')
+  const width = style.width(lines[0])
+
+  // The rim sits one cell in from each edge, like a bevel seen from above.
+  const rim = style()
+    .foreground(WOOD_DARK)
+    .render(' ' + '▀'.repeat(width - 2) + ' ')
+
+  // Legs a fifth of the way in from each side, bold so they read as solid.
+  const legAt = Math.max(2, Math.floor(width / 5))
+  const legRow = () => {
+    const leg = style().bold(true).foreground(WOOD).render('║')
+    const gap = width - 2 * legAt - 2
+    return ' '.repeat(legAt) + leg + ' '.repeat(gap) + leg + ' '.repeat(legAt)
+  }
+
+  // Feet meet the floor line; the floor runs the full width of the table.
+  const foot = style().bold(true).foreground(WOOD).render('╨')
+  const floorInk = style().foreground(FLOOR)
+  const floor =
+    floorInk.render('▁'.repeat(legAt)) +
+    foot +
+    floorInk.render('▁'.repeat(width - 2 * legAt - 2)) +
+    foot +
+    floorInk.render('▁'.repeat(legAt))
+
+  // A soft shadow under the top, narrower than the table, so it looks lit
+  // from above rather than painted on.
+  const shadowW = width - 6
+  const shadow =
+    ' '.repeat(3) + style().foreground(SHADOW).render('░'.repeat(shadowW)) + ' '.repeat(3)
+
+  return [...lines, rim, legRow(), legRow(), floor, shadow].join('\n')
 }
 
 // The bottom line of the felt during the deal: a card sliding from the pile
@@ -200,13 +268,17 @@ function stackLine(game) {
 
 function renderMesa(game, view) {
   const w = CANVAS.width
+  // The flanks sit level with the felt, not with the legs: the felt is the
+  // first rows of the sprite, so a top-aligned join puts the seat beside it
+  // and lets the carpentry hang below on its own.
+  const sprite = feltBlock(game, view)
   const table = style.joinHorizontal(
-    style.position.center,
-    flankLine(game, 3, view, 'right'),
+    style.position.top,
+    flankBeside(game, 3, view, 'right'),
     ' ',
-    feltBlock(game, view),
+    sprite,
     ' ',
-    flankLine(game, 1, view, 'left')
+    flankBeside(game, 1, view, 'left')
   )
 
   return stack(pad(seatLine(game, 2, view), w), pad(table, w), pad(seatLine(game, 0, view), w))
