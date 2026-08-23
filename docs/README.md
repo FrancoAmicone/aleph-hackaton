@@ -18,6 +18,7 @@ Si el tema no está cubierto, ir a `08-links.md`, agarrar el link oficial y trae
 | Algo se rompió y no sé por qué | `06-troubleshooting.md` |
 | Definir qué construimos | `07-ideas.md` |
 | Necesito la fuente original de algo | `08-links.md` |
+| **Correr, instalar o publicar the-great-pear** | `09-the-great-pear.md` |
 | Leer teclas sueltas / raw mode / TUI | `05-bare-runtime.md` + `spikes/01-raw-input/SPIKE.md` |
 | Código P2P que ya funciona, para copiar | `spikes/02-hyperswarm/SPIKE.md` |
 

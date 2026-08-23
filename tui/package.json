@@ -10,7 +10,7 @@
     "format": "prettier . --write",
     "test": "brittle-bare test/index.js",
     "lint": "prettier . --check && lunte",
-    "start": "bare bin.js --no-updates",
+    "start": "node node_modules/bare-runtime/bin/bare bin.js --no-updates",
     "make": "node scripts/make.js",
     "deploy": "node scripts/deploy.js",
     "make:darwin-arm64": "bare-build --name the-great-pear --standalone --host darwin-arm64 --out ./out/darwin-arm64 bin.js",
@@ -18,7 +18,8 @@
     "make:linux-arm64": "bare-build --name the-great-pear --standalone --host linux-arm64 --out ./out/linux-arm64 bin.js",
     "make:linux-x64": "bare-build --name the-great-pear --standalone --host linux-x64 --out ./out/linux-x64 bin.js",
     "make:win32-arm64": "bare-build --name the-great-pear --standalone --host win32-arm64 --out ./out/win32-arm64 bin.js",
-    "make:win32-x64": "bare-build --name the-great-pear --standalone --host win32-x64 --out ./out/win32-x64 bin.js"
+    "make:win32-x64": "bare-build --name the-great-pear --standalone --host win32-x64 --out ./out/win32-x64 bin.js",
+    "start:updates": "node node_modules/bare-runtime/bin/bare bin.js --updates"
   },
   "dependencies": {
     "bare-os": "^3.9.0",
