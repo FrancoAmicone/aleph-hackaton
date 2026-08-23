@@ -246,5 +246,32 @@ Y reintentar.
 | Binarios cross-compilados corren | ✅ linux-x64 en Ubuntu |
 | Delay bajado a 5000 ms | ✅ v1.0.1 |
 | v1.0.1 publicada (5 plataformas) | ✅ drive length 13 |
-| Gino reinstala 1.0.1 | ⬜ **siguiente paso** |
-| OTA v1.0.1 → v1.0.2 demostrado | ⬜ **lo único que falta** |
+| **OTA v1.0.1 → v1.0.2 DEMOSTRADO** | ✅ **22-ago 00:55** |
+
+## ✅ El OTA funcionó — evidencia
+
+Instancia v1.0.1 corriendo, se publicó la v1.0.2, y se actualizó sola:
+
+```
+[00:53:39] * worker arriba | v1.0.1 | storage: ~/Library/Application Support/test-msg/app-storage
+[00:55:38] [updater] getting new update
+[00:55:39] [updater] update complete... applying
+[00:55:39] [updater] applied update, restart to run latest version
+```
+
+**1 segundo** entre detectar y aplicar. Al reiniciar:
+
+```
+=== test-msg v1.0.2 | sala: verif ===
+*** ACTUALIZADO POR OTA P2P — sin descargar nada a mano ***
+```
+
+`test-msg --version` → `test-msg v1.0.2`
+
+Nadie descargó nada a mano. El binario se reemplazó solo, replicando desde un peer.
+
+### Condiciones que lo hicieron posible
+
+1. `delay: 5000` en la v1.0.1 (con el default de 1 hora no se dispara a tiempo)
+2. `pear seed` corriendo — sirvió 259 MB en total
+3. La instancia corriendo con `Updates: enabled`

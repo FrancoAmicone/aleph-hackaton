@@ -145,6 +145,7 @@ try {
   await app.ready()
 
   print(`\n=== test-msg v${pkg.version} | sala: ${room} ===`)
+  print('*** ACTUALIZADO POR OTA P2P — sin descargar nada a mano ***')
   print('Escribí y Enter para mandar. Ctrl+C para salir.\n')
 
   // stdin vive en el proceso principal; el swarm vive en el worker.

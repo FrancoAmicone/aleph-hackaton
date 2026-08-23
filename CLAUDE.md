@@ -188,8 +188,13 @@ Prioridad #1. Un juego perfecto sin OTA no califica.
       ⚠️ El cambio sólo surte efecto desde la versión SIGUIENTE: la instancia instalada
       corre su propio código.
 - [x] v1.0.1 publicada con el fix (5 plataformas, drive length 13)
-- [ ] Gino reinstala 1.0.1 y deja la app corriendo
-- [ ] **OTA v1.0.1 → v1.0.2 demostrado** ← lo único que falta del pipeline
+- [x] ✅ **OTA v1.0.1 → v1.0.2 DEMOSTRADO END-TO-END** (22-ago 00:55).
+      La instancia v1.0.1 detectó y aplicó la v1.0.2 en 1 segundo, sola.
+      `[updater] getting new update` → `update complete... applying` → `applied update`.
+      Verificado: `test-msg --version` → `v1.0.2`. Ver `test-msg/docs/12-ota-explicado.md`.
+
+**🎉 EL PIPELINE DEL TRACK ESTÁ COMPLETO.** Los 6 requisitos duros se cumplen.
+Falta: nombre/key definitivos del juego, la app real, README y video.
 
 > La key `pear://9nbjjp5jmtxxq3jj8ko7z4sdfnohucgwyjsxspdpsnuc8yf136my` es **de prueba**,
 > generada en `test-msg/app`. Nunca se stageó ni se seedeó nada en ella.
