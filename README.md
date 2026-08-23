@@ -174,6 +174,7 @@ Requires [Node.js](https://nodejs.org/) (for npm and the build scripts) and
 [Pear](https://docs.pears.com/) (`npm i -g pear`).
 
 ```sh
+cd tui
 npm install
 npm start          # dev mode — updates disabled so your build is not swapped mid-hand
 npm test           # 138 tests
