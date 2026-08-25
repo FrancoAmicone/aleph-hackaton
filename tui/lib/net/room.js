@@ -1,7 +1,10 @@
 // Una sala de juego sobre Hyperswarm.
 //
-// Se corre DENTRO del worker de Bare, nunca en el proceso de la TUI: así el
-// descubrimiento y el hole punching no le roban frames al render.
+// Corre en el proceso principal, junto a la TUI. Vivió un tiempo dentro de un
+// worker de Bare (`workers/main.js`) para que el descubrimiento no le robara
+// frames al render, pero eso rompía el binario compilado: bare-pack sólo
+// empaqueta lo que alcanza por un `require` estático, y la ruta del worker se
+// resolvía en runtime. Ver docs/06-troubleshooting.md.
 //
 // Sobre el swarm: `lib/pear-cli.js` ya tiene el suyo y le hace
 // `store.replicate(connection)` a TODA conexión entrante, porque el updater lo

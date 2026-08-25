@@ -79,6 +79,21 @@ Otros: `bare-module`, `bare-bundle`, `bare-pack`, `bare-make` (build/packaging),
    equivalentes de Bare.
 4. **Nunca imports dinámicos condicionales.** `bare-pack` escanea el código estáticamente y no
    puede inferir imports que dependen de condiciones de runtime. Usar import maps en su lugar.
+> ### 🔴 El corolario que nos costó horas
+> **Lo que no se alcanza por un `require` literal no entra al binario.** No es sólo cuestión
+> de imports condicionales: cualquier archivo cargado por una ruta que se arma en runtime
+> queda afuera del bundle, y el binario compilado falla donde `npm start` andaba perfecto.
+>
+> Nos pasó con `PearRuntime.run('./workers/main.js')`: la ruta es un string que sólo existe
+> en runtime, bare-pack no la vio, y el standalone se quedó sin capa de red **en silencio**.
+> Post-mortem completo en `06-troubleshooting.md`.
+>
+> Para verificar si un módulo viajó adentro, sin correr nada:
+> ```bash
+> strings -a out/<platform>-<arch>/<app> | grep -c "una-string-unica-de-ese-modulo"
+> ```
+> Y **probar siempre el binario compilado**, no sólo `npm start`.
+
 5. **`b4a` para todo lo que sean bytes.** Es el idiom del ecosistema Hypercore:
    `b4a.from(str, 'hex')`, `b4a.toString(buf, 'hex')`, `b4a.alloc(n)`, `b4a.equals(a, b)`.
 

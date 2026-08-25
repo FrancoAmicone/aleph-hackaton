@@ -13,14 +13,18 @@ Pool total: **$1,500 USDt**
 - 1º — $1,000 USDt
 - 2º — $500 USDt
 
-## Requisitos obligatorios
+## Requisitos obligatorios — y cómo los cumplimos
 
-1. Partir de **cualquier variante de `hello-pear-bare`**.
-2. La herramienta debe instalarse con `pear install pear://<key>`.
-3. Deploy genuino con la Pear CLI **y seeding**.
-4. Updates OTA P2P **demostrados funcionando**.
-5. Enviar el link `pear://` para el juzgado.
-6. **Conectividad P2P obligatoria.**
+| # | Requisito | Estado |
+|---|---|---|
+| 1 | Partir de **cualquier variante de `hello-pear-bare`** | ✅ branch `tui` — ver `01-quickstart.md` |
+| 2 | Instalable con `pear install pear://<key>` | ✅ verificado en Linux y Windows desde otras redes |
+| 3 | Deploy genuino con la Pear CLI **y seeding** | ✅ `pear stage` + `pear seed` — ver `03-deploy-ota.md` |
+| 4 | Updates OTA P2P **demostrados funcionando** | ✅ una copia corriendo pasó de 2.0.4 a 2.0.5 sola |
+| 5 | Enviar el link `pear://` para el juzgado | ✅ `pear://u9y7y9xq…` |
+| 6 | **Conectividad P2P obligatoria** | ✅ partida completa entre dos máquinas en redes distintas |
+
+El link, las plataformas y el manual operativo están en `09-the-great-pear.md`.
 
 ## Direcciones sugeridas por el track
 
@@ -42,10 +46,16 @@ Las tres branches de `hello-pear-bare` cubren casos distintos:
 
 ## Entregables
 
-- Repositorio **público** con README
-- Link `pear://` funcionando, **seedeado durante todo el juzgado**
-- Video demo grabado mostrando **la instalación y el update OTA**
-- Especificación de plataformas de los binarios buildeados
+| Entregable | Dónde |
+|---|---|
+| Repositorio **público** con README | el `README.md` de la raíz |
+| Link `pear://` funcionando, **seedeado durante todo el juzgado** | `09-the-great-pear.md` §1 y §6 |
+| Video demo mostrando **la instalación y el update OTA** | ⬜ pendiente de grabar |
+| Especificación de plataformas de los binarios | darwin arm64/x64, linux x64/arm64, win32 x64 |
+
+> ⚠️ **El seed es el único entregable que puede fallar solo.** Si la máquina que seedea se
+> duerme o pierde la red durante el juzgado, la instalación no se puede verificar y no
+> califica. Dos seeders, suspensión desactivada.
 
 ## Juzgado
 
